@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#120d2b">
+<title>TU BINGO</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#120d2b;--p:#1d1646;--p2:#2a2060;--line:#3a2f7a;--gold:#ffc83d;--pink:#ff5c8a;--teal:#38d9c8;--ink:#f3f0ff;--mute:#a79fd6;--bad:#ff6b6b;--ok:#4be08a;--f:'Fredoka',system-ui,sans-serif;--b:'Nunito',system-ui,sans-serif}
+*{box-sizing:border-box;margin:0}
+body{background:radial-gradient(120% 60% at 50% 0,#2a1c6b 0,var(--bg) 60%) fixed;color:var(--ink);font-family:var(--b);min-height:100dvh;display:flex;justify-content:center}
+#app{width:100%;max-width:480px;padding:0 14px 96px;display:flex;flex-direction:column;gap:12px}
+.top{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;padding:12px 0 8px;background:linear-gradient(var(--bg) 75%,transparent)}
+.logo{font-family:var(--f);font-weight:700;font-size:24px;letter-spacing:.5px}.logo b{color:var(--gold)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.chip{font-family:var(--f);font-weight:600;font-size:15px;background:var(--p2);color:var(--gold);padding:7px 12px;border-radius:999px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--bad);display:inline-block;margin-right:8px}.dot.on{background:var(--ok)}
+.load{height:3px;background:linear-gradient(90deg,transparent,var(--gold),transparent);background-size:200% 100%;animation:ld 1s linear infinite;border-radius:2px}
+@keyframes ld{to{background-position:-200% 0}}
+.msg{padding:12px 14px;border-radius:14px;font-weight:800;font-size:14px;cursor:pointer}.msg.bad{background:#4a1c36;color:#ffb3c6;border:1px solid var(--bad)}.msg.ok{background:#17433a;color:#a9f5d0;border:1px solid var(--ok)}
+.card{background:var(--p);border:1px solid var(--line);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px}
+h1{font-family:var(--f);font-size:26px}h2{font-family:var(--f);font-size:19px}
+.note{color:var(--mute);font-size:13px}.mono{font-family:var(--f);font-weight:600}.gold{color:var(--gold)}
+input,select{font:inherit;width:100%;padding:13px;border-radius:12px;border:1px solid var(--line);background:#0e0a24;color:var(--ink)}
+button,.btn{font-family:var(--f);font-weight:600;border:0;border-radius:14px;padding:14px;font-size:17px;cursor:pointer;min-height:48px;text-align:center;text-decoration:none;display:block}
+button:disabled{opacity:.4;cursor:default}
+.b1{background:var(--gold);color:#2a1f00}.b2{background:var(--pink);color:#fff}.b3{background:var(--p2);color:var(--ink)}.b4{background:none;color:var(--mute);min-height:40px;padding:8px}
+button:focus-visible,input:focus-visible,select:focus-visible,.btn:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px}.tabs .on{background:var(--gold);color:#2a1f00}
+nav{position:fixed;left:0;right:0;bottom:0;display:none;justify-content:center;background:#0c0820;border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom));z-index:9}
+nav div{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;width:100%;max-width:480px}
+nav button{background:none;color:var(--mute);font-size:11px;padding:6px 2px;min-height:54px;display:flex;flex-direction:column;align-items:center;gap:2px;border-radius:12px}
+nav button span{font-size:20px}nav button.on{color:var(--gold);background:var(--p2)}
+.bola{width:128px;height:128px;border-radius:50%;display:grid;place-items:center;font-family:var(--f);font-weight:700;font-size:64px;color:#fff;margin:4px auto;box-shadow:inset 0 -8px 0 rgba(0,0,0,.18),0 8px 24px rgba(0,0,0,.4);animation:pop .4s ease-out}
+@keyframes pop{from{transform:scale(.4);opacity:0}}
+@media (prefers-reduced-motion:reduce){.bola{animation:none}.load{animation:none}}
+.hist{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+.mb{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-family:var(--f);font-weight:600;font-size:16px;color:#fff}
+.t90{display:grid;grid-template-columns:repeat(10,1fr);gap:3px}
+.t{aspect-ratio:1;display:grid;place-items:center;font-size:12px;font-weight:800;border-radius:50%;background:var(--p2);color:#7d74b8}.t.s{color:#fff}
+.prem{display:grid;grid-template-columns:1fr 1fr;gap:8px}.prem>div{background:var(--p2);border-radius:14px;padding:10px;text-align:center}
+.prem b{display:block;font-family:var(--f);font-size:20px;color:var(--gold)}.prem .g{outline:2px solid var(--ok)}
+.cart{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;background:#3b2f86;padding:6px;border-radius:14px}
+.c{aspect-ratio:1/1.12;display:grid;place-items:center;border-radius:7px;font-family:var(--f);font-weight:600;font-size:clamp(15px,4.8vw,21px);background:#fff;color:#1b1340;border:0;padding:0;min-height:0}
+.c.e{background:#2a2060}.c.m{background:var(--gold);box-shadow:inset 0 0 0 3px #c28a00;color:#2a1f00}
+.acts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.mv{display:flex;justify-content:space-between;gap:8px;font-size:14px;border-top:1px solid var(--line);padding-top:8px}
+.in{color:var(--ok)}.out{color:var(--bad)}
+ul{padding-left:18px;display:flex;flex-direction:column;gap:3px;font-size:14px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<nav id="nav"></nav>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,onAuthStateChanged,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,doc,setDoc,addDoc,updateDoc,deleteDoc,onSnapshot,collection,query,where,writeBatch,runTransaction,serverTimestamp,arrayUnion,arrayRemove,increment} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {firebaseConfig} from "./config.js";
+
+const A=document.getElementById('app'),NAV=document.getElementById('nav');
+const fmt=n=>'$'+Math.round(n||0).toLocaleString('es-AR');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const col=n=>`hsl(${(((n-1)/10)|0)*40+10},72%,50%)`;
+if(!firebaseConfig.apiKey||String(firebaseConfig.apiKey).startsWith('PEGAR')){
+  A.innerHTML='<div class="card" style="margin-top:20px"><h1>TU BINGO</h1><p>Falta pegar la configuración de Firebase en el archivo <b>config.js</b>.</p></div>';
+  throw new Error('Falta config.js');
+}
+const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
+
+/* ---------- Sonidos (se generan en el navegador, sin archivos) ---------- */
+let ctxA=null,sonido=true;
+try{sonido=localStorage.getItem('tb_snd')!=='0'}catch(e){}
+['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{
+  if(!ctxA){const C=window.AudioContext||window.webkitAudioContext;if(C)ctxA=new C()}
+  if(ctxA&&ctxA.state==='suspended')ctxA.resume();
+},{passive:true}));
+const SON={
+  inicio:[[523,0,.16],[659,.16,.16],[784,.32,.16],[1047,.48,.4]],
+  bola:[[740,0,.09],[988,.09,.16]],
+  quintina:[[659,0,.14],[784,.14,.14],[988,.28,.14],[1319,.42,.5]],
+  bingo:[[523,0,.12],[659,.12,.12],[784,.24,.12],[1047,.36,.12],[784,.48,.12],[1047,.6,.12],[1319,.72,.7]],
+  error:[[330,0,.18,'triangle'],[247,.18,.3,'triangle']]
+};
+function sonar(n,extra=0){
+  if(!sonido||!SON[n]||!ctxA||ctxA.state!=='running')return;const c=ctxA;
+  SON[n].forEach(([f,t,d,tp])=>{const o=c.createOscillator(),g=c.createGain(),t0=c.currentTime+t+extra;
+    o.type=tp||'sine';o.frequency.value=f;g.gain.setValueAtTime(.0001,t0);g.gain.linearRampToValueAtTime(.22,t0+.02);g.gain.exponentialRampToValueAtTime(.001,t0+d);
+    o.connect(g);g.connect(c.destination);o.start(t0);o.stop(t0+d+.05)});
+}
+
+/* ---------- Estado ---------- */
+let U=null,me=null,cfg={precioCarton:500,comision:0,pctQuintina:30,pctBingo:70,segBola:6,whatsapp:''};
+let abiertas=[],mias=[],hosted=[],movs=[],act=null,jug=null,unsubs=[],unJug=null,unJugKey='';
+let tab='inicio',modo='in',msg=null,busy=false,online=navigator.onLine,pS=null,MK={};
+const pref={prem:'ambos',cupo:'10',n:'1'};
+const MSG={'auth/email-already-in-use':'Ese correo ya tiene una cuenta. Probá entrar.','auth/invalid-credential':'Correo o contraseña incorrectos.','auth/weak-password':'La contraseña necesita al menos 6 caracteres.','auth/invalid-email':'Escribí un correo válido.','permission-denied':'El servidor no aceptó la operación. Revisá tu saldo y que la mesa siga abierta.'};
+const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}},lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+const oculta=id=>lsGet('tb_x_'+id)==='1';
+
+onAuthStateChanged(auth,u=>{
+  unsubs.forEach(f=>f());unsubs=[];if(unJug)unJug();unJug=null;unJugKey='';
+  U=u;me=null;abiertas=[];mias=[];hosted=[];movs=[];act=null;jug=null;pS=null;MK={};
+  if(u){
+    const lista=(q,fn)=>unsubs.push(onSnapshot(q,s=>{fn(s.docs.map(d=>({id:d.id,...d.data({serverTimestamps:'estimate'})})));refrescar()}));
+    unsubs.push(onSnapshot(doc(db,'users',u.uid),s=>{me=s.exists()?s.data():null;view()}));
+    unsubs.push(onSnapshot(doc(db,'config','general'),s=>{if(s.exists())cfg={...cfg,...s.data()};view()}));
+    unsubs.push(onSnapshot(query(collection(db,'movimientos'),where('uid','==',u.uid)),s=>{movs=s.docs.map(d=>d.data({serverTimestamps:'estimate'}));view()}));
+    lista(query(collection(db,'mesas'),where('estado','==','esperando')),l=>abiertas=l);
+    lista(query(collection(db,'mesas'),where('participantes','array-contains',u.uid)),l=>mias=l);
+    lista(query(collection(db,'mesas'),where('anfitrion','==',u.uid)),l=>hosted=l);
+  }
+  view();
+});
+window.addEventListener('online',()=>{online=true;view()});window.addEventListener('offline',()=>{online=false;view()});
+
+function refrescar(){
+  const m=new Map();[...mias,...hosted].forEach(x=>m.set(x.id,x));
+  const rank={jugando:0,esperando:1,terminada:2};
+  const lst=[...m.values()].filter(x=>!oculta(x.id)).sort((a,b)=>rank[a.estado]-rank[b.estado]||((b.creada&&b.creada.toMillis?b.creada.toMillis():0)-(a.creada&&a.creada.toMillis?a.creada.toMillis():0)));
+  act=lst[0]||null;
+  const key=act&&act.participantes.includes(U.uid)?act.id:'';
+  if(key!==unJugKey){
+    if(unJug)unJug();unJug=null;jug=null;unJugKey=key;
+    if(key)unJug=onSnapshot(doc(db,'mesas',key,'jugadores',U.uid),s=>{jug=s.exists()?s.data():null;view()});
+  }
+  sonidos();view();
+}
+function sonidos(){
+  const m=act;if(!m){pS=null;return}
+  const s={id:m.id,e:m.estado,n:m.sorteadas.length,q:!!m.ganQuintina,b:!!m.ganBingo};
+  if(pS&&pS.id===s.id){
+    if(pS.e==='esperando'&&s.e==='jugando')sonar('inicio');
+    else if(s.n>pS.n)sonar('bola');
+    if(!pS.q&&s.q)sonar('quintina',.35);
+    if(!pS.b&&s.b)sonar('bingo',.35);
+  }
+  pS=s;
+}
+
+/* ---------- Cartones ---------- */
+function carton(){
+  for(;;){
+    const cnt=Array(9).fill(1);let rest=6;
+    while(rest>0){const j=Math.random()*9|0;if(cnt[j]<3){cnt[j]++;rest--}}
+    const rows=[0,0,0],mask=[];
+    for(let j=0;j<9;j++){const r=[0,1,2].sort(()=>Math.random()-.5).slice(0,cnt[j]);mask.push(r.sort());r.forEach(x=>rows[x]++)}
+    if(!rows.every(x=>x===5))continue;
+    const c=Array(27).fill(0);
+    for(let j=0;j<9;j++){
+      const lo=j===0?1:j*10,hi=j===8?90:j*10+9,pool=[];for(let n=lo;n<=hi;n++)pool.push(n);
+      const nums=[];while(nums.length<cnt[j])nums.push(pool.splice(Math.random()*pool.length|0,1)[0]);
+      nums.sort((a,b)=>a-b);mask[j].forEach((r,i)=>{c[r*9+j]=nums[i]});
+    }
+    return c;
+  }
+}
+const mkKey=id=>'tb_mk_'+id+'_'+U.uid;
+function marks(id,i){
+  if(!MK[id]){try{MK[id]=JSON.parse(lsGet(mkKey(id))||'{}')}catch(e){MK[id]={}}}
+  return MK[id][i]||[];
+}
+function toggle(id,i,n){const s=new Set(marks(id,i));s.has(n)?s.delete(n):s.add(n);MK[id][i]=[...s].sort((a,b)=>a-b);lsSet(mkKey(id),JSON.stringify(MK[id]))}
+const premios=m=>{
+  const k=m.pozo*(100-(cfg.comision||0)),pb=m.premios==='ambos'?cfg.pctBingo:cfg.pctQuintina+cfg.pctBingo;
+  return{q:Math.floor(k*cfg.pctQuintina/10000),b:Math.floor(k*pb/10000)};
+};
+const mejorFila=(c,mk)=>{let best=0,bn=-1;for(let r=0;r<3;r++){let n=0;for(let j=0;j<9;j++){const v=c[r*9+j];if(v&&mk.includes(v))n++}if(n>bn){bn=n;best=r}}return best};
+
+/* ---------- Vistas ---------- */
+function view(){
+  const y=window.scrollY;
+  if(!U){NAV.style.display='none';A.innerHTML=authView();return}
+  if(!me){NAV.style.display='none';A.innerHTML='<div class="card" style="margin-top:20px"><p>Cargando tu cuenta…</p></div><div class="load"></div>';return}
+  NAV.style.display='flex';
+  const T=[['inicio','🏠','Inicio'],['jugar','🎲','Jugar'],['cartones','🎟️','Cartones'],['saldo','💰','Saldo'],['cuenta','👤','Cuenta']];
+  NAV.innerHTML='<div>'+T.map(([k,i,t])=>`<button class="${tab===k?'on':''}" data-a="tab" data-v="${k}"><span>${i}</span>${t}</button>`).join('')+'</div>';
+  const V={inicio:inicioView,jugar:jugarView,cartones:cartonesView,saldo:saldoView,cuenta:cuentaView}[tab];
+  A.innerHTML=header()+V();
+  window.scrollTo(0,y);
+}
+function header(){
+  return `<div class="top"><div class="logo">TU <b>BINGO</b></div><div class="row"><span title="${online?'Conectado':'Sin conexión'}" role="img" aria-label="${online?'Conectado':'Sin conexión'}"><span class="dot ${online?'on':''}"></span></span><span class="chip">${fmt(me.saldo)}</span></div></div>`
+    +(busy?'<div class="load"></div>':'')+(msg?`<div class="msg ${msg.t}" role="alert" data-a="cerrarMsg">${esc(msg.x)} <span class="note">(tocá para cerrar)</span></div>`:'');
+}
+function authView(){
+  const reg=modo==='up';
+  return `<div style="margin-top:28px;text-align:center"><div class="logo" style="font-size:40px">TU <b>BINGO</b></div><p class="note">Bingo online de 90 bolillas. Mesas de 5 a 30 jugadores.</p></div>
+  <div class="tabs"><button class="b3 ${reg?'':'on'}" data-a="modo" data-v="in">Entrar</button><button class="b3 ${reg?'on':''}" data-a="modo" data-v="up">Crear cuenta</button></div>
+  <form class="card" id="f">
+    ${reg?'<input name="nombre" placeholder="Tu nombre en la mesa" maxlength="16" required autocomplete="nickname">':''}
+    <input name="email" type="email" placeholder="Correo" required autocomplete="email">
+    <input name="pass" type="password" placeholder="Contraseña (mínimo 6)" required minlength="6" autocomplete="${reg?'new-password':'current-password'}">
+    ${msg?`<div class="msg bad">${esc(msg.x)}</div>`:''}
+    <button class="b1" ${busy?'disabled':''}>${reg?'Crear cuenta':'Entrar'}</button>
+    ${reg?'<p class="note">Las cuentas nuevas empiezan con saldo $0. Para jugar, cargá saldo por WhatsApp.</p>':''}
+  </form>`;
+}
+function inicioView(){
+  const m=act;
+  if(!m)return `<div class="card"><h2>¡Hola, ${esc(me.name)}!</h2><p class="note">Todavía no estás en ninguna mesa.</p><button class="b1" data-a="tab" data-v="jugar">Jugar ahora</button></div>`
+    +(me.saldo<cfg.precioCarton?`<div class="card"><b>Tu saldo es ${fmt(me.saldo)}</b><p class="note">Un cartón cuesta ${fmt(cfg.precioCarton)}. Cargá saldo para poder jugar.</p><button class="b3" data-a="tab" data-v="saldo">Ir a Mi saldo</button></div>`:'');
+  return m.estado==='esperando'?esperaView(m):juegoView(m);
+}
+const pLabel=m=>m.premios==='ambos'?'Quintina y Bingo':'Solo Bingo';
+function unirseCtl(m){
+  const pr=m.precio;
+  return `<select data-pref="n" aria-label="Cantidad de cartones">${[1,2,3,4,5,6].map(i=>`<option value="${i}" ${pref.n==i?'selected':''}>${i} ${i===1?'cartón':'cartones'} · ${fmt(i*pr)}</option>`).join('')}</select>
+  <button class="b1" data-a="unirse" data-id="${m.id}" ${busy||m.participantes.length>=m.cupo||me.saldo<(+pref.n)*pr?'disabled':''}>${me.saldo<(+pref.n)*pr?'Saldo insuficiente':m.participantes.length>=m.cupo?'Mesa llena':'Sentarme'}</button>`;
+}
+function esperaView(m){
+  const soy=m.participantes.includes(U.uid),host=m.anfitrion===U.uid,n=m.participantes.length;
+  const txt=encodeURIComponent(`Te espero en ${m.nombre} de TU BINGO. Cartón: ${fmt(m.precio)}. ${location.href}`);
+  return `<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="chip">${n}/${m.cupo}</span></div>
+    <p class="note">Premios: ${pLabel(m)} · Cartón ${fmt(m.precio)} · Anfitrión: ${esc(m.anfitrionNombre||'')}</p>
+    <div class="row"><span>Pozo acumulado</span><b class="mono gold" style="font-size:24px">${fmt(m.pozo)}</b></div></div>
+  <div class="card"><h2>Jugadores sentados</h2>${n?`<ul>${m.participantes.map(u=>`<li>${esc((m.nombres||{})[u]||'Jugador')}${u===m.anfitrion?' (anfitrión)':''}</li>`).join('')}</ul>`:'<p class="note">Todavía no se sentó nadie.</p>'}
+    ${soy&&jug?`<p class="note">Tus cartones: ${jug.cartones.length}</p>`:''}</div>
+  ${!soy?`<div class="card"><h2>Sentate en la mesa</h2>${unirseCtl(m)}</div>`:''}
+  ${host?`<button class="b1" data-a="iniciar" ${busy||n<5?'disabled':''}>${n<5?`Faltan ${5-n} para empezar (mínimo 5)`:'Iniciar partida'}</button>`:`<p class="note">Espera a que el anfitrión inicie la partida (mínimo 5 jugadores).</p>`}
+  <a class="btn b3" target="_blank" rel="noopener" href="https://wa.me/?text=${txt}">Invitar por WhatsApp</a>
+  ${soy?`<button class="b4" data-a="salirMesa" ${busy||(host&&n>1)?'disabled':''}>Salir de la mesa (te devolvemos tu saldo)</button>`:''}
+  ${host&&n===0?`<button class="b4" data-a="cancelar" ${busy?'disabled':''}>Cancelar mesa</button>`:''}`;
+}
+function juegoView(m){
+  const s=m.sorteadas,ult=s[s.length-1],pr=premios(m),host=m.anfitrion===U.uid;
+  const gq=m.ganQuintina,gb=m.ganBingo;
+  const cobro=(g,t,n)=>g&&g.uid===U.uid&&!g.pagado?`<button class="b1" data-a="cobrar" data-t="${t}" ${busy?'disabled':''}>Cobrar ${n} · ${fmt(g.premio)}</button>`:'';
+  return `<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="note">${s.length}/90 bolillas</span></div>
+    ${ult?`<div class="bola" style="background:${col(ult)}" aria-live="polite" aria-label="Salió el ${ult}">${ult}</div>`:'<p class="note" style="text-align:center">Esperando la primera bolilla…</p>'}
+    <div class="hist">${s.slice(-9,-1).reverse().map(n=>`<span class="mb" style="background:${col(n)}">${n}</span>`).join('')}</div>
+    ${m.estado==='jugando'?`<p class="note" style="text-align:center">${host?'Sos el anfitrión: sorteás una bolilla cada '+(cfg.segBola||6)+' segundos.':'La bolilla sale automáticamente.'}</p>`:''}</div>
+  <div class="prem">
+    ${m.premios==='ambos'?`<div class="${gq?'g':''}">QUINTINA<b>${fmt(gq?gq.premio:pr.q)}</b><span class="note">${gq?'Ganó '+esc(gq.nombre):'Disponible'}</span></div>`:''}
+    <div class="${gb?'g':''}" ${m.premios==='ambos'?'':'style="grid-column:1/-1"'}>BINGO<b>${fmt(gb?gb.premio:pr.b)}</b><span class="note">${gb?'Ganó '+esc(gb.nombre):'Disponible'}</span></div></div>
+  ${cobro(gq,'q','Quintina')}${cobro(gb,'b','Bingo')}
+  ${m.estado==='jugando'&&m.participantes.includes(U.uid)?'<button class="b2" data-a="tab" data-v="cartones">Ir a mis cartones</button>':''}
+  ${m.estado==='terminada'?`<div class="card"><b>La partida terminó.</b><button class="b3" data-a="ocultar" data-id="${m.id}" ${(gq&&gq.uid===U.uid&&!gq.pagado)||(gb&&gb.uid===U.uid&&!gb.pagado)?'disabled':''}>Salir de la mesa</button><p class="note">Primero cobrá tus premios, si ganaste.</p></div>`:''}
+  <div class="card"><h2>Tablero</h2><div class="t90">${Array.from({length:90},(_,i)=>i+1).map(n=>s.includes(n)?`<span class="t s" style="background:${col(n)}">${n}</span>`:`<span class="t">${n}</span>`).join('')}</div></div>`;
+}
+function jugarView(){
+  const ocupado=act&&act.estado!=='terminada';
+  const lista=abiertas.filter(m=>m.participantes.length<m.cupo||m.participantes.includes(U.uid));
+  return (ocupado?`<div class="card"><b>Ya estás en la mesa ${esc(act.nombre)}.</b><button class="b3" data-a="tab" data-v="inicio">Ir a mi mesa</button></div>`:`<div class="card"><h2>Crear mesa</h2>
+    <label class="note">Premios<select data-pref="prem"><option value="ambos" ${pref.prem==='ambos'?'selected':''}>Quintina y Bingo</option><option value="bingo" ${pref.prem==='bingo'?'selected':''}>Solo Bingo</option></select></label>
+    <label class="note">Cantidad máxima de jugadores<select data-pref="cupo">${Array.from({length:26},(_,i)=>i+5).map(n=>`<option value="${n}" ${pref.cupo==n?'selected':''}>${n} jugadores</option>`).join('')}</select></label>
+    <p class="note">Cartón: ${fmt(cfg.precioCarton)}. Se necesitan al menos 5 jugadores para empezar.</p>
+    <button class="b1" data-a="crear" ${busy?'disabled':''}>Crear mesa</button></div>`)
+    +`<h2>Mesas abiertas</h2>`
+    +(lista.length?lista.map(m=>`<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="chip">${m.participantes.length}/${m.cupo}</span></div>
+      <p class="note">${pLabel(m)} · Cartón ${fmt(m.precio)} · Pozo ${fmt(m.pozo)}</p>
+      ${ocupado||m.participantes.includes(U.uid)?'<p class="note">Ya estás en una mesa.</p>':unirseCtl(m)}</div>`).join(''):'<p class="note">No hay mesas abiertas. Creá la primera.</p>');
+}
+function cartonesView(){
+  const m=act;
+  if(!m||!m.participantes.includes(U.uid))return '<div class="card"><b>No tenés cartones.</b><p class="note">Sentate en una mesa para recibir tus cartones.</p><button class="b1" data-a="tab" data-v="jugar">Ir a Jugar</button></div>';
+  if(!jug)return '<div class="card"><p>Cargando tus cartones…</p></div>';
+  const jugando=m.estado==='jugando';
+  return `<p class="note">Tocá un número para marcarlo. Cuando completes una línea o el cartón, tocá el premio.</p>`
+    +jug.cartones.map((k,i)=>{const mk=marks(m.id,i);
+      return `<div class="card"><div class="row"><h2>Cartón ${i+1}</h2><span class="note">${mk.length} marcados</span></div>
+      <div class="cart">${k.c.map(v=>v?`<button class="c ${mk.includes(v)?'m':''}" data-a="mk" data-i="${i}" data-n="${v}" aria-pressed="${mk.includes(v)}" aria-label="Número ${v}">${v}</button>`:'<span class="c e"></span>').join('')}</div>
+      ${jugando?`<div class="acts">${m.premios==='ambos'&&!m.ganQuintina?`<button class="b2" data-a="recl" data-t="q" data-i="${i}" ${busy?'disabled':''}>¡QUINTINA!</button>`:''}${!m.ganBingo?`<button class="b1" data-a="recl" data-t="b" data-i="${i}" ${busy?'disabled':''}>¡BINGO!</button>`:''}</div>`:''}</div>`}).join('');
+}
+const TIPO={carga:'Carga de saldo',compra:'Compra de cartones',premio:'Premio cobrado',devolucion:'Devolución',ajuste:'Ajuste',retiro:'Retiro'};
+function saldoView(){
+  const cod=U.uid.slice(0,6),w=cfg.whatsapp?`https://wa.me/${cfg.whatsapp}?text=`:'https://wa.me/?text=';
+  const l=[...movs].sort((a,b)=>((b.creado&&b.creado.toMillis?b.creado.toMillis():0)-(a.creado&&a.creado.toMillis?a.creado.toMillis():0))).slice(0,30);
+  return `<div class="card" style="text-align:center"><span class="note">Tu saldo</span><b class="mono gold" style="font-size:40px">${fmt(me.saldo)}</b><p class="note">Tu código: <b>${cod}</b></p></div>
+  <a class="btn b1" target="_blank" rel="noopener" href="${w}${encodeURIComponent('Hola, quiero cargar saldo. Mi usuario: '+me.name+' (código '+cod+')')}">Cargar saldo por WhatsApp</a>
+  <a class="btn b3" target="_blank" rel="noopener" href="${w}${encodeURIComponent('Hola, quiero retirar el saldo (código '+cod+')')}">Retirar saldo</a>
+  <div class="card"><h2>Movimientos</h2>${l.length?l.map(x=>`<div class="mv"><span>${esc(TIPO[x.tipo]||x.tipo)}${x.detalle?'<br><span class="note">'+esc(x.detalle)+'</span>':''}</span><span class="mono ${x.monto>=0?'in':'out'}">${x.monto>=0?'+':''}${fmt(x.monto)}</span></div>`).join(''):'<p class="note">Todavía no hay movimientos.</p>'}</div>`;
+}
+function cuentaView(){
+  return `<div class="card"><h2>${esc(me.name)}</h2><p class="note">${esc(U.email||'')}</p><p class="note">Código de jugador: <b>${U.uid.slice(0,6)}</b></p></div>
+  <button class="b3" data-a="snd">${sonido?'🔊 Sonidos activados':'🔇 Sonidos silenciados'}</button>
+  <button class="b3" data-a="salir">Cerrar sesión</button>`;
+}
+
+/* ---------- Acciones ---------- */
+document.addEventListener('change',e=>{const k=e.target.dataset&&e.target.dataset.pref;if(k){pref[k]=e.target.value;view()}});
+document.addEventListener('submit',async e=>{
+  if(e.target.id!=='f')return;e.preventDefault();
+  const f=new FormData(e.target);msg=null;busy=true;view();
+  try{
+    if(modo==='up'){
+      const c=await createUserWithEmailAndPassword(auth,f.get('email'),f.get('pass'));
+      await setDoc(doc(db,'users',c.user.uid),{name:String(f.get('nombre')).trim().slice(0,16)||'Jugador',saldo:0,admin:false,creado:serverTimestamp()});
+    }else await signInWithEmailAndPassword(auth,f.get('email'),f.get('pass'));
+  }catch(x){msg={t:'bad',x:MSG[x.code]||'No se pudo completar. Probá de nuevo.'}}
+  busy=false;view();
+});
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a;
+  if(a==='tab'){tab=b.dataset.v;msg=null;window.scrollTo(0,0);return view()}
+  if(a==='modo'){modo=b.dataset.v;msg=null;return view()}
+  if(a==='cerrarMsg'){msg=null;return view()}
+  if(a==='salir')return signOut(auth);
+  if(a==='snd'){sonido=!sonido;lsSet('tb_snd',sonido?'1':'0');if(sonido)sonar('inicio');return view()}
+  if(a==='mk'){if(act){toggle(act.id,+b.dataset.i,+b.dataset.n);view()}return}
+  if(a==='ocultar'){lsSet('tb_x_'+b.dataset.id,'1');return refrescar()}
+  busy=true;msg=null;view();
+  try{await accion(a,b)}catch(x){msg={t:'bad',x:MSG[x.code]||'No se pudo completar. Probá de nuevo.'}}
+  busy=false;view();
+});
+
+async function accion(a,b){
+  const u=U.uid,uref=doc(db,'users',u);
+  if(a==='crear'){
+    await addDoc(collection(db,'mesas'),{nombre:'Mesa #'+(100+Math.floor(Math.random()*900)),anfitrion:u,anfitrionNombre:me.name,premios:pref.prem,cupo:+pref.cupo,precio:cfg.precioCarton,estado:'esperando',participantes:[],nombres:{},pozo:0,ncart:0,sorteadas:[],ultimaBola:serverTimestamp(),ganQuintina:null,ganBingo:null,creada:serverTimestamp()});
+    tab='inicio';
+  }
+  if(a==='cancelar')await deleteDoc(doc(db,'mesas',act.id));
+  if(a==='unirse'){
+    const m=[...abiertas,...hosted].find(x=>x.id===b.dataset.id),n=+pref.n,costo=n*m.precio;
+    if(me.saldo<costo)throw{code:'permission-denied'};
+    const w=writeBatch(db);
+    w.set(doc(db,'mesas',m.id,'jugadores',u),{uid:u,name:me.name,cartones:Array.from({length:n},()=>({c:carton()}))});
+    w.update(doc(db,'mesas',m.id),{participantes:arrayUnion(u),pozo:increment(costo),ncart:increment(n),['nombres.'+u]:me.name});
+    w.update(uref,{saldo:increment(-costo)});
+    w.set(doc(collection(db,'movimientos')),{uid:u,tipo:'compra',monto:-costo,detalle:m.nombre+' · '+n+(n===1?' cartón':' cartones'),creado:serverTimestamp()});
+    await w.commit();tab='inicio';
+  }
+  if(a==='salirMesa'){
+    const m=act,n=jug?jug.cartones.length:0,costo=n*m.precio;
+    const w=writeBatch(db);
+    w.delete(doc(db,'mesas',m.id,'jugadores',u));
+    w.update(doc(db,'mesas',m.id),{participantes:arrayRemove(u),pozo:increment(-costo),ncart:increment(-n)});
+    w.update(uref,{saldo:increment(costo),mesaSalida:m.id});
+    w.set(doc(collection(db,'movimientos')),{uid:u,tipo:'devolucion',monto:costo,detalle:m.nombre,creado:serverTimestamp()});
+    await w.commit();
+  }
+  if(a==='iniciar')await updateDoc(doc(db,'mesas',act.id),{estado:'jugando',ultimaBola:serverTimestamp()});
+  if(a==='recl')await reclamar(b.dataset.t,+b.dataset.i);
+  if(a==='cobrar'){
+    const t=b.dataset.t,m=act,g=t==='q'?m.ganQuintina:m.ganBingo,k=t==='q'?'ganQuintina':'ganBingo';
+    const w=writeBatch(db);
+    w.update(doc(db,'mesas',m.id),{[k+'.pagado']:true});
+    w.update(uref,{saldo:increment(g.premio),mesaCobro:m.id,tipoCobro:t});
+    w.set(doc(collection(db,'movimientos')),{uid:u,tipo:'premio',monto:g.premio,detalle:(t==='q'?'Quintina':'Bingo')+' · '+m.nombre,creado:serverTimestamp()});
+    await w.commit();
+    msg={t:'ok',x:'¡Cobraste '+fmt(g.premio)+'!'};
+  }
+}
+
+/* ---------- Reclamar premios: el servidor (reglas) decide ---------- */
+async function reclamar(t,i){
+  const m=act,c=jug.cartones[i].c,mk=marks(m.id,i),pr=premios(m),ref=doc(db,'mesas',m.id);
+  const base={uid:U.uid,nombre:me.name,carton:i,marcas:mk,pagado:false};
+  const datos=t==='q'?{ganQuintina:{...base,fila:mejorFila(c,mk),premio:pr.q}}:{ganBingo:{...base,premio:pr.b},estado:'terminada'};
+  try{
+    await updateDoc(ref,datos);
+    msg={t:'ok',x:t==='q'?'¡QUINTINA aceptada! Ya podés cobrar tu premio en Inicio.':'¡BINGO aceptado! Ya podés cobrar tu premio en Inicio.'};
+    tab='inicio';
+  }catch(x){
+    if(x.code!=='permission-denied')throw x;
+    const motivo=motivoRechazo(t,m,c,mk);
+    msg={t:'bad',x:'Reclamo de '+(t==='q'?'QUINTINA':'BINGO')+' rechazado. '+motivo};
+    sonar('error');
+    try{await addDoc(collection(db,'rechazos'),{uid:U.uid,nombre:me.name,mesa:m.id,mesaNombre:m.nombre,premio:t==='q'?'quintina':'bingo',carton:i+1,motivo,marcas:mk,creado:serverTimestamp()})}catch(e){}
+  }
+}
+function motivoRechazo(t,m,c,mk){
+  const g=t==='q'?m.ganQuintina:m.ganBingo;
+  if(g)return 'Ese premio ya fue otorgado a '+g.nombre+'.';
+  if(m.estado!=='jugando')return 'La partida no está en juego.';
+  const fuera=mk.filter(n=>!m.sorteadas.includes(n));
+  if(fuera.length)return 'Marcaste números que todavía no salieron: '+fuera.join(', ')+'.';
+  if(t==='q'){
+    for(let r=0;r<3;r++){const f=c.slice(r*9,r*9+9).filter(Boolean);if(f.every(v=>mk.includes(v)))return 'El servidor no pudo validar la fila.'}
+    return 'Ninguna fila tiene sus 5 números marcados.';
+  }
+  const falta=c.filter(v=>v&&!mk.includes(v)).length;
+  return falta?'Te faltan '+falta+' números por marcar.':'El servidor no pudo validar el cartón.';
+}
+
+/* ---------- Bolillero: lo maneja el anfitrión ---------- */
+let sorteando=0;
+setInterval(async()=>{
+  const m=act;if(!U||!m||m.estado!=='jugando'||m.ganBingo||m.sorteadas.length>=90||Date.now()-sorteando<4000)return;
+  const ult=m.ultimaBola&&m.ultimaBola.toMillis?m.ultimaBola.toMillis():Date.now(),dt=Date.now()-ult;
+  const host=m.anfitrion===U.uid,seg=Math.max(3,+cfg.segBola||6);
+  if(!((host&&dt>=seg*1000)||(!host&&m.participantes.includes(U.uid)&&dt>=30000)))return;
+  sorteando=Date.now();
+  try{
+    const ref=doc(db,'mesas',m.id);
+    await runTransaction(db,async t=>{
+      const d=(await t.get(ref)).data();
+      if(d.estado!=='jugando'||d.ganBingo||d.sorteadas.length>=90)return;
+      const pool=Array.from({length:90},(_,i)=>i+1).filter(n=>!d.sorteadas.includes(n));
+      const n=pool[crypto.getRandomValues(new Uint32Array(1))[0]%pool.length];
+      t.update(ref,{sorteadas:[...d.sorteadas,n],ultimaBola:serverTimestamp()});
+    });
+  }catch(e){}
+},1000);
+</script>
+</body>
+</html>

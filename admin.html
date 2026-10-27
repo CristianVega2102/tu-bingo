@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TU BINGO · Administrador</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#120d2b;--p:#1d1646;--p2:#2a2060;--line:#3a2f7a;--gold:#ffc83d;--pink:#ff5c8a;--ink:#f3f0ff;--mute:#a79fd6;--bad:#ff6b6b;--ok:#4be08a;--f:'Fredoka',system-ui,sans-serif;--b:'Nunito',system-ui,sans-serif}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--b);min-height:100dvh;display:flex;justify-content:center}
+#app{width:100%;max-width:540px;padding:14px 14px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px}
+h1{font-family:var(--f);font-size:24px}h1 b{color:var(--gold)}h2{font-family:var(--f);font-size:18px}
+.card{background:var(--p);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+label{font-size:13px;color:var(--mute);display:flex;flex-direction:column;gap:5px}
+input{font:inherit;width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:#0e0a24;color:var(--ink)}
+button{font-family:var(--f);font-weight:600;border:0;border-radius:12px;padding:12px;font-size:15px;cursor:pointer}
+button:disabled{opacity:.4}
+.b1{background:var(--gold);color:#2a1f00}.b2{background:var(--p2);color:var(--ink)}.b3{background:none;color:var(--mute)}
+button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.mono{font-family:var(--f);font-weight:600}.gold{color:var(--gold)}.note{color:var(--mute);font-size:12px}
+.err{color:var(--bad);font-size:13px;font-weight:800}.okm{color:var(--ok);font-size:13px;font-weight:800}
+.u{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:8px}
+.mv{border-top:1px solid var(--line);padding-top:8px;font-size:13px;display:flex;flex-direction:column;gap:2px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,doc,onSnapshot,collection,query,orderBy,limit,setDoc,writeBatch,increment,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {firebaseConfig} from "./config.js";
+
+const A=document.getElementById('app');
+const fmt=n=>'$'+Math.round(n||0).toLocaleString('es-AR');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+if(!firebaseConfig.apiKey||String(firebaseConfig.apiKey).startsWith('PEGAR')){A.innerHTML='<div class="card"><h1>Administrador</h1><p>Falta pegar la configuración de Firebase en <b>config.js</b>.</p></div>';throw new Error('Falta config.js')}
+const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
+const ts=t=>t&&t.toDate?t.toDate().toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'}):'';
+let U=null,me=null,cfg={precioCarton:500,comision:0,pctQuintina:30,pctBingo:70,segBola:6,whatsapp:''},us=[],rz=[],ms=[],q='',err='',ok='',unsubs=[];
+
+onAuthStateChanged(auth,u=>{
+  unsubs.forEach(f=>f());unsubs=[];U=u;me=null;us=[];rz=[];ms=[];
+  if(u){
+    unsubs.push(onSnapshot(doc(db,'users',u.uid),s=>{
+      const was=me&&me.admin;me=s.exists()?s.data():null;
+      if(me&&me.admin&&!was){
+        unsubs.push(onSnapshot(collection(db,'users'),s=>{us=s.docs.map(d=>({id:d.id,...d.data()}));lista()}));
+        unsubs.push(onSnapshot(query(collection(db,'rechazos'),orderBy('creado','desc'),limit(20)),s=>{rz=s.docs.map(d=>d.data());extras()}));
+        unsubs.push(onSnapshot(query(collection(db,'mesas'),orderBy('creada','desc'),limit(15)),s=>{ms=s.docs.map(d=>d.data());extras()}));
+        unsubs.push(onSnapshot(doc(db,'config','general'),s=>{if(s.exists())cfg={...cfg,...s.data()};view()}));
+      }
+      view();
+    }));
+  }
+  view();
+});
+
+function view(){
+  if(!U)return A.innerHTML=`<h1>TU <b>BINGO</b> · Admin</h1><form class="card" id="f"><input name="email" type="email" placeholder="Correo" required><input name="pass" type="password" placeholder="Contraseña" required>${err?`<div class="err">${err}</div>`:''}<button class="b1">Entrar</button></form>`;
+  if(!me)return A.innerHTML='<p class="note">Cargando…</p>';
+  if(!me.admin)return A.innerHTML='<h1>Sin permiso</h1><p class="note">Esta cuenta no es de administrador.</p><button class="b2" data-a="salir">Salir</button>';
+  A.innerHTML=`<div class="row"><h1>TU <b>BINGO</b> · Admin</h1><button class="b3" data-a="salir">Salir</button></div>
+  <form class="card" id="cf"><h2>Configuración</h2>
+    <label>Precio del cartón (en pesos)<input name="pre" type="number" min="1" step="1" value="${cfg.precioCarton}"></label>
+    <label>Premio QUINTINA (% del pozo)<input name="pq" type="number" min="0" max="100" step="1" value="${cfg.pctQuintina}"></label>
+    <label>Premio BINGO (% del pozo)<input name="pb" type="number" min="0" max="100" step="1" value="${cfg.pctBingo}"></label>
+    <label>Comisión de la casa (%, se descuenta del pozo antes de repartir premios)<input name="com" type="number" min="0" max="50" step="1" value="${cfg.comision||0}"></label>
+    <label>Segundos entre bolillas (3 a 60)<input name="seg" type="number" min="3" max="60" step="1" value="${cfg.segBola||6}"></label>
+    <label>WhatsApp para cargas y retiros (solo números, con código de país)<input name="wa" inputmode="numeric" value="${esc(cfg.whatsapp||'')}"></label>
+    <p class="note">En mesas "solo Bingo", el Bingo cobra la suma de Quintina + Bingo.</p>
+    ${err?`<div class="err">${err}</div>`:''}${ok?`<div class="okm">${ok}</div>`:''}
+    <button class="b1">Guardar configuración</button></form>
+  <div class="card"><h2>Jugadores</h2><div class="note" id="cont"></div><input id="q" placeholder="Buscar por nombre o código" value="${esc(q)}" aria-label="Buscar jugador"><div id="lista"></div></div>
+  <div class="card"><h2>Reclamos rechazados</h2><div id="rz"></div></div>
+  <div class="card"><h2>Últimas mesas y resultados</h2><div id="ms"></div></div>`;
+  lista();extras();
+}
+function lista(){
+  const el=document.getElementById('lista');if(!el)return;
+  const t=q.trim().toLowerCase();
+  const l=us.filter(u=>!t||(u.name||'').toLowerCase().includes(t)||u.id.slice(0,6).toLowerCase().includes(t)).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const ct=document.getElementById('cont');if(ct)ct.textContent=us.length+' registrados';
+  el.innerHTML=l.length?l.map(u=>`<div class="u"><div class="row"><b>${esc(u.name||'?')}${u.admin?' (admin)':''}</b><span class="mono gold">${fmt(u.saldo)}</span></div><span class="note">Código ${u.id.slice(0,6)}</span>
+    <div class="row"><input id="m-${u.id}" type="number" min="1" step="1" placeholder="Monto" aria-label="Monto para ${esc(u.name||'')}"><button class="b1" data-a="cred" data-u="${u.id}">Acreditar</button><button class="b2" data-a="deb" data-u="${u.id}">Debitar</button></div></div>`).join(''):'<p class="note">No hay jugadores con ese dato.</p>';
+}
+function extras(){
+  const r=document.getElementById('rz');
+  if(r)r.innerHTML=rz.length?rz.map(x=>`<div class="mv"><b>${esc(x.nombre||'?')} · ${esc(x.premio||'')} · cartón ${esc(x.carton||'')}</b><span>${esc(x.motivo||'')}</span><span class="note">${esc(x.mesaNombre||'')} · ${ts(x.creado)}</span></div>`).join(''):'<p class="note">No hay reclamos rechazados.</p>';
+  const m=document.getElementById('ms');
+  if(m)m.innerHTML=ms.length?ms.map(x=>`<div class="mv"><b>${esc(x.nombre)} · ${esc(x.estado)}</b><span>Pozo ${fmt(x.pozo)} · ${x.participantes?x.participantes.length:0} jugadores · ${x.premios==='ambos'?'Quintina y Bingo':'Solo Bingo'}</span>
+    ${x.ganQuintina?`<span>Quintina: ${esc(x.ganQuintina.nombre)} (${fmt(x.ganQuintina.premio)}${x.ganQuintina.pagado?', cobrado':', sin cobrar'})</span>`:''}
+    ${x.ganBingo?`<span>Bingo: ${esc(x.ganBingo.nombre)} (${fmt(x.ganBingo.premio)}${x.ganBingo.pagado?', cobrado':', sin cobrar'})</span>`:''}
+    <span class="note">${ts(x.creada)}</span></div>`).join(''):'<p class="note">Todavía no hay mesas.</p>';
+}
+document.addEventListener('input',e=>{if(e.target.id==='q'){q=e.target.value;lista()}});
+document.addEventListener('submit',async e=>{
+  e.preventDefault();const f=new FormData(e.target);err='';ok='';
+  try{
+    if(e.target.id==='f')await signInWithEmailAndPassword(auth,f.get('email'),f.get('pass'));
+    if(e.target.id==='cf'){
+      const n=k=>Math.floor(+f.get(k));
+      const precioCarton=n('pre'),pctQuintina=n('pq'),pctBingo=n('pb'),comision=n('com'),segBola=n('seg');
+      if(!(precioCarton>=1)||!(pctQuintina>=0&&pctQuintina<=100)||!(pctBingo>=0&&pctBingo<=100)||!(comision>=0&&comision<=50)||!(segBola>=3&&segBola<=60)){err='Revisá los números: precio mayor a 0, porcentajes de 0 a 100, comisión de 0 a 50 y segundos de 3 a 60.';return view()}
+      if(pctQuintina+pctBingo>100){err='Quintina + Bingo no pueden pasar de 100%.';return view()}
+      await setDoc(doc(db,'config','general'),{precioCarton,pctQuintina,pctBingo,comision,segBola,whatsapp:String(f.get('wa')).replace(/\D/g,'')});
+      ok='Configuración guardada. Las mesas nuevas toman el precio nuevo.';view();
+    }
+  }catch(x){err=x.code==='auth/invalid-credential'?'Correo o contraseña incorrectos.':'No se pudo completar. Probá de nuevo.';view()}
+});
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a;
+  if(a==='salir')return signOut(auth);
+  const id=b.dataset.u,n=Math.floor(+document.getElementById('m-'+id).value);
+  if(!(n>0))return;
+  const u=us.find(x=>x.id===id),sg=a==='cred'?1:-1;
+  if(sg<0&&n>(u.saldo||0)){alert('El jugador no tiene tanto saldo.');return}
+  if(!confirm(`${sg>0?'Acreditar':'Debitar'} ${fmt(n)} a ${u.name}?`))return;
+  b.disabled=true;
+  try{
+    const w=writeBatch(db);
+    w.update(doc(db,'users',id),{saldo:increment(sg*n)});
+    w.set(doc(collection(db,'movimientos')),{uid:id,tipo:sg>0?'carga':'retiro',monto:sg*n,detalle:sg>0?'Acreditado por el administrador':'Retiro pagado por el administrador',por:me.name,creado:serverTimestamp()});
+    await w.commit();
+  }catch(x){alert('No se pudo guardar el movimiento.')}
+  b.disabled=false;
+});
+</script>
+</body>
+</html>
