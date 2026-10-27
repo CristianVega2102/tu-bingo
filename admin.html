@@ -39,7 +39,7 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 if(!firebaseConfig.apiKey||String(firebaseConfig.apiKey).startsWith('PEGAR')){A.innerHTML='<div class="card"><h1>Administrador</h1><p>Falta pegar la configuración de Firebase en <b>config.js</b>.</p></div>';throw new Error('Falta config.js')}
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
 const ts=t=>t&&t.toDate?t.toDate().toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'}):'';
-let U=null,me=null,cfg={precioCarton:500,comision:0,pctQuintina:30,pctBingo:70,segBola:6,whatsapp:''},us=[],rz=[],ms=[],q='',err='',ok='',unsubs=[];
+let U=null,me=null,cfg={precioCarton:500,comision:0,pctQuintina:30,pctBingo:70,segBola:6,segInicio:15,whatsapp:''},us=[],rz=[],ms=[],q='',err='',ok='',unsubs=[];
 
 onAuthStateChanged(auth,u=>{
   unsubs.forEach(f=>f());unsubs=[];U=u;me=null;us=[];rz=[];ms=[];
@@ -63,13 +63,14 @@ function view(){
   if(!me)return A.innerHTML='<p class="note">Cargando…</p>';
   if(!me.admin)return A.innerHTML='<h1>Sin permiso</h1><p class="note">Esta cuenta no es de administrador.</p><button class="b2" data-a="salir">Salir</button>';
   A.innerHTML=`<div class="row"><h1>TU <b>BINGO</b> · Admin</h1><button class="b3" data-a="salir">Salir</button></div>
-  <div class="card"><h2>Mesas</h2><p class="note">Las mesas las armás desde la app, con tu cuenta de administrador: pestaña Jugar → Armar mesa (de 2 a 50 jugadores). Al iniciar la partida, las bolillas salen solas con el ritmo que fijes abajo en "Segundos entre bolillas". Alcanza con que haya jugadores conectados.</p><a class="b1" style="text-align:center;text-decoration:none;border-radius:12px;padding:12px;font-family:var(--f);font-weight:600" href="index.html">Ir a la app</a></div>
+  <div class="card"><h2>Mesas</h2><p class="note">Las mesas las armás desde la app, con tu cuenta de administrador: pestaña Jugar → Armar mesa (de 2 a 50 jugadores). Cada mesa empieza sola cuando se completa el cupo, con una cuenta regresiva. Al iniciar la partida, las bolillas salen solas con el ritmo que fijes abajo en "Segundos entre bolillas". Alcanza con que haya jugadores conectados.</p><a class="b1" style="text-align:center;text-decoration:none;border-radius:12px;padding:12px;font-family:var(--f);font-weight:600" href="index.html">Ir a la app</a></div>
   <form class="card" id="cf"><h2>Configuración</h2>
     <label>Precio del cartón (en pesos)<input name="pre" type="number" min="1" step="1" value="${cfg.precioCarton}"></label>
     <label>Premio QUINTINA (% del pozo)<input name="pq" type="number" min="0" max="100" step="1" value="${cfg.pctQuintina}"></label>
     <label>Premio BINGO (% del pozo)<input name="pb" type="number" min="0" max="100" step="1" value="${cfg.pctBingo}"></label>
     <label>Comisión de la casa (%, se descuenta del pozo antes de repartir premios)<input name="com" type="number" min="0" max="50" step="1" value="${cfg.comision||0}"></label>
     <label>Segundos entre bolillas (3 a 60)<input name="seg" type="number" min="3" max="60" step="1" value="${cfg.segBola||6}"></label>
+    <label>Cuenta regresiva para iniciar la partida cuando se completa la mesa (5 a 120 segundos)<input name="ini" type="number" min="5" max="120" step="1" value="${cfg.segInicio||15}"></label>
     <label>WhatsApp para cargas y retiros (solo números, con código de país)<input name="wa" inputmode="numeric" value="${esc(cfg.whatsapp||'')}"></label>
     <p class="note">En mesas "solo Bingo", el Bingo cobra la suma de Quintina + Bingo.</p>
     ${err?`<div class="err">${err}</div>`:''}${ok?`<div class="okm">${ok}</div>`:''}
@@ -103,10 +104,10 @@ document.addEventListener('submit',async e=>{
     if(e.target.id==='f')await signInWithEmailAndPassword(auth,f.get('email'),f.get('pass'));
     if(e.target.id==='cf'){
       const n=k=>Math.floor(+f.get(k));
-      const precioCarton=n('pre'),pctQuintina=n('pq'),pctBingo=n('pb'),comision=n('com'),segBola=n('seg');
-      if(!(precioCarton>=1)||!(pctQuintina>=0&&pctQuintina<=100)||!(pctBingo>=0&&pctBingo<=100)||!(comision>=0&&comision<=50)||!(segBola>=3&&segBola<=60)){err='Revisá los números: precio mayor a 0, porcentajes de 0 a 100, comisión de 0 a 50 y segundos de 3 a 60.';return view()}
+      const precioCarton=n('pre'),pctQuintina=n('pq'),pctBingo=n('pb'),comision=n('com'),segBola=n('seg'),segInicio=n('ini');
+      if(!(precioCarton>=1)||!(pctQuintina>=0&&pctQuintina<=100)||!(pctBingo>=0&&pctBingo<=100)||!(comision>=0&&comision<=50)||!(segBola>=3&&segBola<=60)||!(segInicio>=5&&segInicio<=120)){err='Revisá los números: precio mayor a 0, porcentajes de 0 a 100, comisión de 0 a 50 segundos entre bolillas de 3 a 60 y cuenta regresiva de 5 a 120.';return view()}
       if(pctQuintina+pctBingo>100){err='Quintina + Bingo no pueden pasar de 100%.';return view()}
-      await setDoc(doc(db,'config','general'),{precioCarton,pctQuintina,pctBingo,comision,segBola,whatsapp:String(f.get('wa')).replace(/\D/g,'')});
+      await setDoc(doc(db,'config','general'),{precioCarton,pctQuintina,pctBingo,comision,segBola,segInicio,whatsapp:String(f.get('wa')).replace(/\D/g,'')});
       ok='Configuración guardada. Las mesas nuevas toman el precio nuevo.';view();
     }
   }catch(x){err=x.code==='auth/invalid-credential'?'Correo o contraseña incorrectos.':'No se pudo completar. Probá de nuevo.';view()}
