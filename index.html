@@ -85,6 +85,7 @@ ul{padding-left:18px;display:flex;flex-direction:column;gap:3px;font-size:14px}
 .cant b{font-size:20px;letter-spacing:.5px}.cant small{font-family:var(--b);font-weight:700;font-size:12px;opacity:.8}
 .cb{background:linear-gradient(90deg,#f2c14e,#ffdf8a);color:#3a2600}.cq{background:linear-gradient(90deg,#ff5c8a,#ff8aa9);color:#fff}
 details.card summary{cursor:pointer;font-family:var(--f);font-weight:600;font-size:17px}
+.aband{background:none;border:1px solid #7a2f3f;color:#ff9fb0;border-radius:12px;padding:10px;font-size:14px;min-height:44px}
 </style>
 </head>
 <body>
@@ -135,6 +136,7 @@ const pref={prem:'ambos',cupo:'10',n:'1'};
 const MSG={'auth/email-already-in-use':'Ese correo ya tiene una cuenta. Probá entrar.','auth/invalid-credential':'Correo o contraseña incorrectos.','auth/weak-password':'La contraseña necesita al menos 6 caracteres.','auth/invalid-email':'Escribí un correo válido.','permission-denied':'El servidor no aceptó la operación. Revisá tu saldo y que la mesa siga abierta.'};
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}},lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const oculta=id=>lsGet('tb_x_'+id)==='1';
+const visible=x=>{const ab=(x.abandonaron||[]).includes(U.uid);if(!ab)return true;const g=x.ganBingo;return x.estado==='terminada'&&!!g&&g.uid===U.uid&&!g.pagado};
 let voz=lsGet('tb_voz')!=='0',auto=lsGet('tb_auto')==='1';const abiertos=new Set([0]);
 
 onAuthStateChanged(auth,u=>{
@@ -156,7 +158,7 @@ window.addEventListener('online',()=>{online=true;view()});window.addEventListen
 function refrescar(){
   const m=new Map();[...mias,...hosted].forEach(x=>m.set(x.id,x));
   const rank={jugando:0,esperando:1,terminada:2};
-  const lst=[...m.values()].filter(x=>!oculta(x.id)).sort((a,b)=>rank[a.estado]-rank[b.estado]||((b.creada&&b.creada.toMillis?b.creada.toMillis():0)-(a.creada&&a.creada.toMillis?a.creada.toMillis():0)));
+  const lst=[...m.values()].filter(x=>!oculta(x.id)&&visible(x)).sort((a,b)=>rank[a.estado]-rank[b.estado]||((b.creada&&b.creada.toMillis?b.creada.toMillis():0)-(a.creada&&a.creada.toMillis?a.creada.toMillis():0)));
   act=(pin&&lst.find(x=>x.id===pin))||lst[0]||null;
   const key=act&&act.participantes.includes(U.uid)?act.id:'';
   if(key!==unJugKey){
@@ -285,7 +287,7 @@ function esperaView(m){
   <div class="card"><h2>Jugadores sentados</h2>${n?`<ul>${m.participantes.map(u=>`<li>${esc((m.nombres||{})[u]||'Jugador')}${u===m.anfitrion?' (anfitrión)':''}</li>`).join('')}</ul>`:'<p class="note">Todavía no se sentó nadie.</p>'}
     ${soy&&jug?`<p class="note">Tus cartones: ${jug.cartones.length}</p>`:''}</div>
   ${!soy?`<div class="card"><h2>Sentate en la mesa</h2>${unirseCtl(m)}</div>`:''}
-  ${host?`<button class="b1" data-a="iniciar" data-id="${m.id}" ${busy||n<2?'disabled':''}>${n<2?`Faltan ${2-n} para empezar (mínimo 2)`:'Iniciar partida'}</button>`:`<p class="note">Esperá a que el administrador inicie la partida.</p>`}
+  ${host?`<button class="b1" data-a="iniciar" data-id="${m.id}" ${busy||n<1?'disabled':''}>${n<1?'Esperando al primer jugador':'Iniciar partida'}</button><p class="note">Una vez iniciada la partida, no se pueden sumar más jugadores.</p>`:`<p class="note">Esperá a que el administrador inicie la partida.</p>`}
   <a class="btn b3" target="_blank" rel="noopener" href="https://wa.me/?text=${txt}">Invitar por WhatsApp</a>
   ${soy?`<button class="b4" data-a="salirMesa" ${busy||(host&&n>1)?'disabled':''}>Salir de la mesa (te devolvemos tu saldo)</button>`:''}
   ${host&&n===0?`<button class="b4" data-a="cancelar" data-id="${m.id}" ${busy?'disabled':''}>Cancelar mesa</button>`:''}`;
@@ -300,7 +302,7 @@ function cartonHTML(m,i,k,ult){
   ${n>1?`<button class="ver" data-a="abrir" data-i="${i}">Ocultar grilla</button>`:''}</div>`;
 }
 function juegoView(m){
-  const s=m.sorteadas,ult=s[s.length-1],pr=premios(m),gq=m.ganQuintina,gb=m.ganBingo,part=m.participantes.includes(U.uid),jugando=m.estado==='jugando';
+  const s=m.sorteadas,ult=s[s.length-1],pr=premios(m),gq=m.ganQuintina,gb=m.ganBingo,yoAb=(m.abandonaron||[]).includes(U.uid),part=m.participantes.includes(U.uid)&&!yoAb,jugando=m.estado==='jugando';
   const cobro=(g,t,n)=>g&&g.uid===U.uid&&!g.pagado?`<button class="b1" data-a="cobrar" data-t="${t}" ${busy?'disabled':''}>Cobrar ${n} · ${fmt(g.premio)}</button>`:'';
   const nom=ult&&NOMBRES[ult];
   const bol=`<div class="live"><div class="row"><span class="lt"><i class="ld"></i>BOLILLERO CENTRAL EN VIVO</span><button class="voz ${voz?'on':''}" data-a="voz" aria-pressed="${voz}">🔊 ¡Voz Criolla!</button></div>
@@ -308,8 +310,8 @@ function juegoView(m){
       <div class="binfo"><div class="up">ÚLTIMA BOLA <span class="nb">#${s.length}</span></div><div class="tt">${ult?ult+(nom?' - ¡'+esc(nom)+'!':''):'Esperando…'}</div>${ult?`<div class="it">“${cap(enLetras(ult))}”</div>`:''}</div>
       ${jugando?`<div class="ringw"><svg viewBox="0 0 64 64" aria-hidden="true"><circle class="rb" cx="32" cy="32" r="26"/><circle id="ring" class="rf" cx="32" cy="32" r="26" stroke-dasharray="163.4" stroke-dashoffset="163.4"/></svg><b id="sig">…</b><span>Siguiente</span></div>`:''}</div>
     <div class="ant"><span>ANTERIORES:</span>${s.slice(-7,-1).reverse().map((n,j)=>`<span class="pb" style="opacity:${1-j*.13}">${pad(n)}</span>`).join('')}</div>
-    ${jugando?`<p class="nt" style="text-align:center">Las bolillas salen solas cada ${cfg.segBola||6} segundos.</p>`:''}</div>`;
-  const prem=`<div class="prem">${m.premios==='ambos'?`<div class="${gq?'g':''}">QUINTINA<b>${fmt(gq?gq.premio:pr.q)}</b><span class="note">${gq?'Ganó '+esc(gq.nombre):'Disponible'}</span></div>`:''}<div class="${gb?'g':''}" ${m.premios==='ambos'?'':'style="grid-column:1/-1"'}>BINGO<b>${fmt(gb?gb.premio:pr.b)}</b><span class="note">${gb?'Ganó '+esc(gb.nombre):'Disponible'}</span></div></div>`;
+    ${jugando?`<p class="nt" style="text-align:center">Las bolillas salen solas cada ${cfg.segBola||6} segundos.</p>`:''}${jugando&&m.participantes.includes(U.uid)&&!yoAb?'<button class="aband" data-a="aband">🚪 Salir / abandonar mesa</button>':''}</div>`;
+  const prem=`<div class="prem">${m.premios==='ambos'?`<div class="${gq?'g':''}">QUINTINA<b>${fmt(gq?gq.premio:pr.q)}</b><span class="note">${gq?'Ganó '+esc(gq.nombre):'Disponible'}</span></div>`:''}<div class="${gb?'g':''}" ${m.premios==='ambos'?'':'style="grid-column:1/-1"'}>BINGO<b>${fmt(gb?gb.premio:pr.b)}</b><span class="note">${gb?'Ganó '+esc(gb.nombre)+(gb.abandono?' por abandono':''):'Disponible'}</span></div></div>`;
   let hint='';
   if(part&&jug&&jugando){
     const an=jug.cartones.map((k,i)=>({i,a:analiza(m,i,k.c)}));
@@ -321,7 +323,7 @@ function juegoView(m){
       if(x.a.falta<=3)hint=`<div class="hint"><div><b>${x.a.falta===0?'¡Cartón completo! Cantá BINGO':'¡A '+x.a.falta+' del BINGO!'}</b><br><span class="nt">Cartón ${cid(m,x.i)}</span></div></div>`;
     }
   }
-  const cards=part?(jug?`<div class="row"><h2>Tus cartones (${jug.cartones.length})</h2><label class="sw">Auto-Marcado <button class="swb ${auto?'on':''}" data-a="auto" role="switch" aria-checked="${auto}" aria-label="Auto-marcado"><i></i></button></label></div>${hint}${jug.cartones.map((k,i)=>cartonHTML(m,i,k,ult)).join('')}`:'<div class="card"><p>Cargando tus cartones…</p></div>'):'';
+  const cards=yoAb&&jugando?`<div class="card"><b>Abandonaste esta mesa.</b><p class="note">Tus cartones ya no participan.</p><button class="b3" data-a="ocultar" data-id="${m.id}">Salir de la mesa</button></div>`:part?(jug?`<div class="row"><h2>Tus cartones (${jug.cartones.length})</h2><label class="sw">Auto-Marcado <button class="swb ${auto?'on':''}" data-a="auto" role="switch" aria-checked="${auto}" aria-label="Auto-marcado"><i></i></button></label></div>${hint}${jug.cartones.map((k,i)=>cartonHTML(m,i,k,ult)).join('')}`:'<div class="card"><p>Cargando tus cartones…</p></div>'):'';
   const cant=part&&jug&&jugando?`<div class="cant">${m.premios==='ambos'&&!gq?`<button class="cq" data-a="recl" data-t="q" ${busy?'disabled':''}><b>¡CANTAR QUINTINA!</b><small>El servidor valida tu cartón</small></button>`:''}${!gb?`<button class="cb" data-a="recl" data-t="b" ${busy?'disabled':''}><b>¡CANTAR BINGO!</b><small>Validación del servidor · Pozo ${fmt(m.pozo)}</small></button>`:''}</div>`:'';
   return `${bol}${prem}${cobro(gq,'q','Quintina')}${cobro(gb,'b','Bingo')}${cards}
   ${m.estado==='terminada'?`<div class="card"><b>La partida terminó.</b><button class="b3" data-a="ocultar" data-id="${m.id}" ${(gq&&gq.uid===U.uid&&!gq.pagado)||(gb&&gb.uid===U.uid&&!gb.pagado)?'disabled':''}>Salir de la mesa</button><p class="note">Primero cobrá tus premios, si ganaste.</p></div>`:''}
@@ -341,11 +343,11 @@ function jugarView(){
     h+=`<div class="card"><h2>Armar mesa (administrador)</h2>
       <label class="note">Premios<select data-pref="prem"><option value="ambos" ${pref.prem==='ambos'?'selected':''}>Quintina y Bingo</option><option value="bingo" ${pref.prem==='bingo'?'selected':''}>Solo Bingo</option></select></label>
       <label class="note">Cantidad máxima de jugadores<select data-pref="cupo">${Array.from({length:49},(_,i)=>i+2).map(n=>`<option value="${n}" ${pref.cupo==n?'selected':''}>${n} jugadores</option>`).join('')}</select></label>
-      <p class="note">Cartón: ${fmt(cfg.precioCarton)}. Se puede iniciar con 2 o más jugadores.</p>
+      <p class="note">Cartón: ${fmt(cfg.precioCarton)}. Se puede iniciar con 1 jugador o más. Una vez iniciada, nadie más puede sumarse.</p>
       <button class="b1" data-a="crear" ${busy?'disabled':''}>Crear mesa</button></div>`;
     if(mias.length)h+='<h2>Mis mesas</h2>'+mias.map(m=>`<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="chip">${m.participantes.length}/${m.cupo}</span></div>
       <p class="note">${m.estado==='esperando'?'Esperando jugadores':'En juego · '+m.sorteadas.length+' bolillas'} · ${pLabel(m)} · Pozo ${fmt(m.pozo)}</p>
-      <div class="acts"><button class="b3" data-a="ver" data-id="${m.id}">Abrir</button>${m.estado==='esperando'?`<button class="b1" data-a="iniciar" data-id="${m.id}" ${busy||m.participantes.length<2?'disabled':''}>Iniciar</button>`:''}${m.estado==='esperando'&&m.participantes.length===0?`<button class="b4" data-a="cancelar" data-id="${m.id}" ${busy?'disabled':''}>Cancelar</button>`:''}</div></div>`).join('');
+      <div class="acts"><button class="b3" data-a="ver" data-id="${m.id}">Abrir</button>${m.estado==='esperando'?`<button class="b1" data-a="iniciar" data-id="${m.id}" ${busy||m.participantes.length<1?'disabled':''}>Iniciar</button>`:''}${m.estado==='esperando'&&m.participantes.length===0?`<button class="b4" data-a="cancelar" data-id="${m.id}" ${busy?'disabled':''}>Cancelar</button>`:''}</div></div>`).join('');
   }
   return h+mesasAbiertas(ocupado);
 }
@@ -390,6 +392,7 @@ document.addEventListener('click',async e=>{
   if(a==='abrir'){const i=+b.dataset.i;abiertos.has(i)?abiertos.delete(i):abiertos.add(i);return view()}
   if(a==='ocultar'){lsSet('tb_x_'+b.dataset.id,'1');if(pin===b.dataset.id)pin=null;return refrescar()}
   if(a==='ver'){pin=b.dataset.id;tab='inicio';window.scrollTo(0,0);return refrescar()}
+  if(a==='aband'&&!confirm('Si abandonás, perdés tus cartones y tu parte del pozo. Si queda un solo jugador, gana por abandono. ¿Seguro?'))return;
   busy=true;msg=null;view();
   try{await accion(a,b)}catch(x){msg={t:'bad',x:MSG[x.code]||'No se pudo completar. Probá de nuevo.'}}
   busy=false;view();
@@ -398,7 +401,7 @@ document.addEventListener('click',async e=>{
 async function accion(a,b){
   const u=U.uid,uref=doc(db,'users',u);
   if(a==='crear'){
-    await addDoc(collection(db,'mesas'),{nombre:'Mesa #'+(100+Math.floor(Math.random()*900)),anfitrion:u,anfitrionNombre:me.name,premios:pref.prem,cupo:+pref.cupo,precio:cfg.precioCarton,estado:'esperando',participantes:[],nombres:{},pozo:0,ncart:0,sorteadas:[],ultimaBola:serverTimestamp(),ganQuintina:null,ganBingo:null,creada:serverTimestamp()});
+    await addDoc(collection(db,'mesas'),{nombre:'Mesa #'+(100+Math.floor(Math.random()*900)),anfitrion:u,anfitrionNombre:me.name,premios:pref.prem,cupo:+pref.cupo,precio:cfg.precioCarton,estado:'esperando',participantes:[],nombres:{},pozo:0,ncart:0,sorteadas:[],abandonaron:[],ultimaBola:serverTimestamp(),ganQuintina:null,ganBingo:null,creada:serverTimestamp()});
     tab='inicio';
   }
   if(a==='cancelar')await deleteDoc(doc(db,'mesas',b.dataset.id||act.id));
@@ -422,6 +425,20 @@ async function accion(a,b){
     await w.commit();
   }
   if(a==='iniciar')await updateDoc(doc(db,'mesas',b.dataset.id||act.id),{estado:'jugando',ultimaBola:serverTimestamp()});
+  if(a==='aband'){
+    const ref=doc(db,'mesas',act.id);let fin=false,gano=false;
+    await runTransaction(db,async t=>{
+      const d=(await t.get(ref)).data(),a0=d.abandonaron||[];
+      if(d.estado!=='jugando'||d.ganBingo||a0.includes(u))return;
+      const ab=[...a0,u],restan=d.participantes.filter(x=>!ab.includes(x)),datos={abandonaron:ab};
+      if(restan.length<=1){
+        const w=restan.length===1?restan[0]:u,k=d.pozo*(100-(cfg.comision||0)),pct=(d.premios==='ambos'&&d.ganQuintina)?cfg.pctBingo:cfg.pctQuintina+cfg.pctBingo;
+        datos.ganBingo={uid:w,nombre:(d.nombres||{})[w]||'Jugador',premio:Math.floor(k*pct/10000),pagado:false,abandono:true};datos.estado='terminada';fin=true;gano=w===u;
+      }
+      t.update(ref,datos);
+    });
+    msg={t:'ok',x:fin&&gano?'Eras el último jugador: ganaste por abandono. Cobrá tu premio en Inicio.':'Abandonaste la mesa.'};tab='inicio';
+  }
   if(a==='recl')await reclamar(b.dataset.t);
   if(a==='cobrar'){
     const t=b.dataset.t,m=act,g=t==='q'?m.ganQuintina:m.ganBingo,k=t==='q'?'ganQuintina':'ganBingo';
@@ -485,7 +502,7 @@ async function sortear(m){
 }
 setInterval(()=>{
   if(!U)return;
-  const cand=new Map();[...hosted,...mias].forEach(m=>{if(m.estado==='jugando')cand.set(m.id,m)});
+  const cand=new Map();[...hosted,...mias].forEach(m=>{if(m.estado==='jugando'&&!(m.abandonaron||[]).includes(U.uid))cand.set(m.id,m)});
   cand.forEach(m=>{
     if(m.ganBingo||m.sorteadas.length>=90||Date.now()-(sorteando[m.id]||0)<3000)return;
     if(jit[m.id]===undefined)jit[m.id]=m.anfitrion===U.uid?0:300+Math.floor(Math.random()*1500);
