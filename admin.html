@@ -90,7 +90,7 @@ function lista(){
 }
 function extras(){
   const r=document.getElementById('rz');
-  if(r)r.innerHTML=rz.length?rz.map(x=>`<div class="mv"><b>${esc(x.nombre||'?')} · ${esc(x.premio||'')} · cartón ${esc(x.carton||'')}</b><span>${esc(x.motivo||'')}</span><span class="note">${esc(x.mesaNombre||'')} · ${ts(x.creado)}</span></div>`).join(''):'<p class="note">No hay reclamos rechazados.</p>';
+  if(r)r.innerHTML=rz.length?rz.map(x=>`<div class="mv"><b>${esc(x.nombre||'?')} · ${esc(x.premio||'')} · cartón ${esc(x.carton||'')}</b><span>${esc(x.motivo||'')}</span>${x.diag?'<span class="note" style="word-break:break-all">'+esc(x.diag)+'</span>':''}<span class="note">${esc(x.mesaNombre||'')} · ${ts(x.creado)}</span></div>`).join(''):'<p class="note">No hay reclamos rechazados.</p>';
   const m=document.getElementById('ms');
   if(m)m.innerHTML=ms.length?ms.map(x=>`<div class="mv"><b>${esc(x.nombre)} · ${esc(x.estado)}</b><span>Pozo ${fmt(x.pozo)} · ${x.participantes?x.participantes.length:0} jugadores · ${x.premios==='ambos'?'Quintina y Bingo':'Solo Bingo'}</span>
     ${x.ganQuintina?`<span>Quintina: ${esc(x.ganQuintina.nombre)} (${fmt(x.ganQuintina.premio)}${x.ganQuintina.pagado?', cobrado':', sin cobrar'})</span>`:''}
