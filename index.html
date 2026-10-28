@@ -101,6 +101,7 @@ import {getAuth,onAuthStateChanged,createUserWithEmailAndPassword,signInWithEmai
 import {getFirestore,doc,getDoc,setDoc,addDoc,updateDoc,deleteDoc,onSnapshot,collection,query,where,writeBatch,runTransaction,serverTimestamp,arrayUnion,arrayRemove,increment} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {firebaseConfig} from "./config.js";
 
+const VERSION='2026-10-27 · v8';
 const A=document.getElementById('app'),NAV=document.getElementById('nav');
 const fmt=n=>'$'+Math.round(n||0).toLocaleString('es-AR');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -400,7 +401,7 @@ function saldoView(){
   <div class="card"><h2>Movimientos</h2>${l.length?l.map(x=>`<div class="mv"><span>${esc(TIPO[x.tipo]||x.tipo)}${x.detalle?'<br><span class="note">'+esc(x.detalle)+'</span>':''}</span><span class="mono ${x.monto>=0?'in':'out'}">${x.monto>=0?'+':''}${fmt(x.monto)}</span></div>`).join(''):'<p class="note">Todavía no hay movimientos.</p>'}</div>`;
 }
 function cuentaView(){
-  return `<div class="card"><h2>${esc(me.name)}</h2><p class="note">${esc(U.email||'')}</p><p class="note">Código de jugador: <b>${U.uid.slice(0,6)}</b></p></div>
+  return `<div class="card"><h2>${esc(me.name)}</h2><p class="note">${esc(U.email||'')}</p><p class="note">Código de jugador: <b>${U.uid.slice(0,6)}</b></p><p class="note">Versión de la app: ${VERSION}</p></div>
   <button class="b3" data-a="snd">${sonido?'🔊 Sonidos activados':'🔇 Sonidos silenciados'}</button>
   <button class="b3" data-a="voz">${voz?'🗣️ Voz Criolla activada':'🤐 Voz Criolla silenciada'}</button>
   <button class="b3" data-a="salir">Cerrar sesión</button>`;
@@ -534,12 +535,43 @@ async function reclamar(t){
     tab='inicio';
   }catch(x){
     if(x.code!=='permission-denied')throw x;
-    let fresca=m;try{const sn=await getDoc(ref);if(sn.exists())fresca={id:m.id,...sn.data()}}catch(e){}
-    const motivo=motivoRechazo(t,fresca,c,mk);
+    const rz=await diagnostico(t,m,i,mk),motivo=rz.motivo;
     msg={t:'bad',x:'Reclamo de '+(t==='q'?'QUINTINA':'BINGO')+' rechazado. '+motivo};
     sonar('error');
-    try{await addDoc(collection(db,'rechazos'),{uid:U.uid,nombre:me.name,mesa:m.id,mesaNombre:m.nombre,premio:t==='q'?'quintina':'bingo',carton:i+1,motivo,marcas:mk,creado:serverTimestamp()})}catch(e){}
+    try{await addDoc(collection(db,'rechazos'),{uid:U.uid,nombre:me.name,mesa:m.id,mesaNombre:m.nombre,premio:t==='q'?'quintina':'bingo',carton:i+1,motivo,marcas:mk,diag:JSON.stringify(rz.diag),version:VERSION,creado:serverTimestamp()})}catch(e){}
   }
+}
+// Cuando el servidor rechaza, se comparan uno por uno los datos reales (mesa, cartón, configuración)
+// con lo que exigen las reglas, para decir exactamente qué falló.
+async function diagnostico(t,m,i,mk){
+  const D={version:VERSION};let motivo=null;
+  try{
+    const [ms,js,cs]=await Promise.all([getDoc(doc(db,'mesas',m.id)),getDoc(doc(db,'mesas',m.id,'jugadores',U.uid)),getDoc(doc(db,'config','general'))]);
+    const f=ms.exists()?ms.data():null,jd=js.exists()?js.data():null,cf=cs.exists()?cs.data():{};
+    D.estado=f&&f.estado;D.premios=f&&f.premios;D.participante=!!(f&&f.participantes.includes(U.uid));D.tieneCarton=!!jd;
+    const g=f&&(t==='q'?f.ganQuintina:f.ganBingo);
+    if(!f)motivo='La mesa ya no existe.';
+    else if(g)motivo='Otro jugador reclamó antes: '+g.nombre+' ganó '+(t==='q'?'la QUINTINA':'el BINGO')+'. El premio es para quien reclama primero.';
+    else if(f.estado!=='jugando')motivo='La partida no está en juego.';
+    else if(t==='q'&&f.premios!=='ambos')motivo='Esta mesa no reparte Quintina.';
+    else if(!D.participante||(f.abandonaron||[]).includes(U.uid))motivo='No estás participando en esta mesa.';
+    else if(!jd||!jd.cartones||!jd.cartones[i])motivo='No se encontró tu cartón en el servidor.';
+    else{
+      const c=jd.cartones[i].c||[],nz=c.filter(Boolean),fuera=mk.filter(n=>!f.sorteadas.includes(n));
+      D.celdas=c.length;D.numeros=nz.length;D.distintos=new Set(nz).size;D.marcas=mk;D.fuera=fuera;
+      if(fuera.length)motivo='Marcaste números que todavía no salieron: '+fuera.join(', ')+'.';
+      else if(c.length!==27||nz.length!==15||new Set(nz).size!==15)motivo='Tu cartón no tiene un formato válido (15 números distintos).';
+      else if(t==='q'){const r=mejorFila(c,mk),fr=c.slice(r*9,r*9+9).filter(Boolean);D.fila=r;D.faltan=fr.filter(v=>!mk.includes(v));if(D.faltan.length)motivo='A la fila le falta marcar: '+D.faltan.join(', ')+'.'}
+      else{D.faltan=nz.filter(v=>!mk.includes(v));if(D.faltan.length)motivo='Te faltan '+D.faltan.length+' números por marcar.'}
+      if(!motivo){
+        const com=cf.comision||0,pq=cf.pctQuintina===undefined?30:cf.pctQuintina,pbv=cf.pctBingo===undefined?70:cf.pctBingo;
+        const pct=t==='q'?pq:(f.premios==='ambos'?pbv:pq+pbv),esperado=Math.floor(f.pozo*(100-com)*pct/10000);
+        D.premioEnviado=premios(m)[t];D.premioServidor=esperado;D.pozo=f.pozo;D.config=cf;
+        if(D.premioEnviado!==esperado)motivo='El premio calculado no coincide con la configuración actual. Probá de nuevo.';
+      }
+    }
+  }catch(e){D.error=e.code||e.message}
+  return{motivo:motivo||'El servidor rechazó un reclamo que parecía válido. El detalle quedó registrado para el administrador.',diag:D};
 }
 function motivoRechazo(t,m,c,mk){
   const g=t==='q'?m.ganQuintina:m.ganBingo;
