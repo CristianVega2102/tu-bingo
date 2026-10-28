@@ -123,6 +123,7 @@ const SON={
   bola:[[740,0,.09],[988,.09,.16]],
   quintina:[[659,0,.14],[784,.14,.14],[988,.28,.14],[1319,.42,.5]],
   bingo:[[523,0,.12],[659,.12,.12],[784,.24,.12],[1047,.36,.12],[784,.48,.12],[1047,.6,.12],[1319,.72,.7]],
+  tick:[[880,0,.07]],
   error:[[330,0,.18,'triangle'],[247,.18,.3,'triangle']]
 };
 function sonar(n,extra=0){
@@ -201,6 +202,7 @@ function carton(){
     return c;
   }
 }
+function cartonDoc(){const c=carton(),f=r=>c.slice(r*9,r*9+9).filter(Boolean);return{c,f0:f(0),f1:f(1),f2:f(2)}}
 const mkKey=id=>'tb_mk_'+id+'_'+U.uid;
 function marks(id,i){
   if(!MK[id]){try{MK[id]=JSON.parse(lsGet(mkKey(id))||'{}')}catch(e){MK[id]={}}}
@@ -217,6 +219,13 @@ const enLetras=n=>n<30?U30[n]:DEC[(n/10)|0]+(n%10?' y '+U30[n%10]:'');
 const cap=t=>t.charAt(0).toUpperCase()+t.slice(1),pad=n=>String(n).padStart(2,'0');
 // Nombres de la cábala. Los que no figuran se muestran solo con el número.
 const NOMBRES={1:'El agua',2:'El niño',3:'San Cono',4:'La cama',5:'El gato',6:'El perro',7:'El revólver',8:'El incendio',9:'El arroyo',10:'El cañón',11:'El minero',12:'El soldado',13:'La yeta',14:'El borracho',15:'La niña bonita',16:'El anillo',17:'La desgracia',18:'La sangre',19:'El pescado',20:'La fiesta',21:'La mujer',22:'El loco',23:'El cocinero',24:'El caballo',25:'La gallina',26:'La misa',27:'El peine',28:'Los cerros',29:'San Pedro',30:'Santa Rosa',31:'La luz',32:'El dinero',33:'Cristo',34:'La cabeza',35:'El pajarito',36:'La castidad',47:'El muerto',48:'El muerto que habla'};
+function hablarTexto(t){
+  if(!voz||!('speechSynthesis' in window))return;
+  try{const u=new SpeechSynthesisUtterance(t);u.lang='es-AR';u.rate=.95;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}
+}
+const NUM5=['','uno','dos','tres','cuatro','cinco'];
+// Texto que se dice en la cuenta regresiva: "El bingo está por comenzar en cinco... cuatro... tres..."
+const decirCuenta=r=>r===5?'El bingo está por comenzar en cinco':(r>=1&&r<=4?NUM5[r]:'');
 function hablar(n){
   if(!voz||!n||!('speechSynthesis' in window))return;
   try{const u=new SpeechSynthesisUtterance(enLetras(n)+(NOMBRES[n]?'. '+NOMBRES[n]:''));u.lang='es-AR';u.rate=.95;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}
@@ -314,9 +323,9 @@ function esperaView(m){
     <div class="row"><span>Pozo acumulado</span><b class="mono gold" style="font-size:24px">${fmt(m.pozo)}</b></div></div>
   <div class="card"><h2>Jugadores sentados</h2>${n?`<ul>${m.participantes.map(u=>`<li>${esc((m.nombres||{})[u]||'Jugador')}${u===m.anfitrion?' (anfitrión)':''}</li>`).join('')}</ul>`:'<p class="note">Todavía no se sentó nadie.</p>'}
     ${soy&&jug?`<p class="note">Tus cartones: ${jug.cartones.length}</p>`:''}</div>
-  ${!soy?`<div class="card"><h2>Sentate en la mesa</h2>${unirseCtl(m)}</div>`:''}
-  ${n>=m.cupo&&m.llenaEn?`<div class="card" style="text-align:center"><h2>¡Mesa completa!</h2><p>La partida empieza en <b id="cdi" class="mono gold" style="font-size:30px">${restaInicio(m)}</b> segundos</p></div>`:`<div class="card"><b>Faltan ${Math.max(0,m.cupo-n)} jugador${m.cupo-n===1?'':'es'} para completar la mesa.</b><p class="note">La partida empieza sola cuando se completen los ${m.cupo} jugadores, con una cuenta regresiva de ${cfg.segInicio||15} segundos. Una vez iniciada, no se pueden sumar más jugadores.</p></div>`}
-  ${host?`<button class="b3" data-a="iniciar" data-id="${m.id}" ${busy||n<1?'disabled':''}>⚠️ Iniciar partida ahora (emergencia)</button>`:''}
+  ${!soy&&!m.llenaEn?`<div class="card"><h2>Sentate en la mesa</h2>${unirseCtl(m)}</div>`:''}
+  ${m.llenaEn&&(n>=m.cupo||m.forzada)?`<div class="card" style="text-align:center"><h2>${n>=m.cupo?'¡Mesa completa!':'¡Inicio de emergencia!'}</h2><p>La partida empieza en <b id="cdi" class="mono gold" style="font-size:30px">${restaInicio(m)}</b> segundos</p></div>`:`<div class="card"><b>Faltan ${Math.max(0,m.cupo-n)} jugador${m.cupo-n===1?'':'es'} para completar la mesa.</b><p class="note">La partida empieza sola cuando se completen los ${m.cupo} jugadores, con una cuenta regresiva de ${cfg.segInicio||15} segundos. Una vez iniciada, no se pueden sumar más jugadores.</p></div>`}
+  ${host?(m.llenaEn&&m.forzada?`<button class="b3" data-a="cancelarInicio" data-id="${m.id}" ${busy?'disabled':''}>Cancelar el inicio de emergencia</button>`:(m.llenaEn?'':`<button class="b3" data-a="iniciar" data-id="${m.id}" ${busy||n<1?'disabled':''}>⚠️ Iniciar partida (emergencia)</button>`)):''}
   <a class="btn b3" target="_blank" rel="noopener" href="https://wa.me/?text=${txt}">Invitar por WhatsApp</a>
   ${soy?`<button class="b4" data-a="salirMesa" ${busy||(host&&n>1)?'disabled':''}>Salir de la mesa (te devolvemos tu saldo)</button>`:''}
   ${host&&n===0?`<button class="b4" data-a="cancelar" data-id="${m.id}" ${busy?'disabled':''}>Cancelar mesa</button>`:''}`;
@@ -359,7 +368,7 @@ function juegoView(m){
   <details class="card"><summary>Tablero de 90 números</summary><div class="t90" style="margin-top:10px">${Array.from({length:90},(_,i)=>i+1).map(n=>s.includes(n)?`<span class="t s" style="background:${col(n)}">${n}</span>`:`<span class="t">${n}</span>`).join('')}</div></details>${finPanel(m)}`;
 }
 function mesasAbiertas(ocupado){
-  const lista=abiertas.filter(m=>m.participantes.length<m.cupo||m.participantes.includes(U.uid));
+  const lista=abiertas.filter(m=>(m.participantes.length<m.cupo&&!m.llenaEn)||m.participantes.includes(U.uid));
   return '<h2>Mesas disponibles</h2>'+(lista.length?lista.map(m=>`<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="chip">${m.participantes.length}/${m.cupo}</span></div>
     <p class="note">${pLabel(m)} · Cartón ${fmt(m.precio)} · Pozo ${fmt(m.pozo)}</p>
     ${ocupado||(act&&act.estado!=='terminada')||m.participantes.includes(U.uid)?'<p class="note">Ya estás en una mesa.</p>':unirseCtl(m)}</div>`).join(''):'<div class="card"><p class="note">Por ahora no hay mesas disponibles. El administrador las va a abrir.</p></div>');
@@ -376,7 +385,7 @@ function jugarView(){
       <button class="b1" data-a="crear" ${busy?'disabled':''}>Crear mesa</button></div>`;
     if(mias.length)h+='<h2>Mis mesas</h2>'+mias.map(m=>`<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="chip">${m.participantes.length}/${m.cupo}</span></div>
       <p class="note">${m.estado==='esperando'?'Esperando jugadores':'En juego · '+m.sorteadas.length+' bolillas'} · ${pLabel(m)} · Pozo ${fmt(m.pozo)}</p>
-      <div class="acts"><button class="b3" data-a="ver" data-id="${m.id}">Abrir</button>${m.estado==='esperando'&&m.participantes.length>=1?`<button class="b3" data-a="iniciar" data-id="${m.id}" ${busy?'disabled':''}>⚠️ Iniciar (emergencia)</button>`:''}${m.estado==='esperando'&&m.participantes.length===0?`<button class="b4" data-a="cancelar" data-id="${m.id}" ${busy?'disabled':''}>Cancelar</button>`:''}</div></div>`).join('');
+      <div class="acts"><button class="b3" data-a="ver" data-id="${m.id}">Abrir</button>${m.estado==='esperando'&&m.participantes.length>=1&&!m.llenaEn?`<button class="b3" data-a="iniciar" data-id="${m.id}" ${busy?'disabled':''}>⚠️ Iniciar (emergencia)</button>`:''}${m.estado==='esperando'&&m.forzada&&m.llenaEn?`<button class="b3" data-a="cancelarInicio" data-id="${m.id}" ${busy?'disabled':''}>Cancelar inicio</button>`:''}${m.estado==='esperando'&&m.participantes.length===0?`<button class="b4" data-a="cancelar" data-id="${m.id}" ${busy?'disabled':''}>Cancelar</button>`:''}</div></div>`).join('');
   }
   return h+mesasAbiertas(ocupado);
 }
@@ -393,6 +402,7 @@ function saldoView(){
 function cuentaView(){
   return `<div class="card"><h2>${esc(me.name)}</h2><p class="note">${esc(U.email||'')}</p><p class="note">Código de jugador: <b>${U.uid.slice(0,6)}</b></p></div>
   <button class="b3" data-a="snd">${sonido?'🔊 Sonidos activados':'🔇 Sonidos silenciados'}</button>
+  <button class="b3" data-a="voz">${voz?'🗣️ Voz Criolla activada':'🤐 Voz Criolla silenciada'}</button>
   <button class="b3" data-a="salir">Cerrar sesión</button>`;
 }
 
@@ -430,7 +440,7 @@ document.addEventListener('click',async e=>{
   if(a==='cerrarPanel'){panelCerrado.add(b.dataset.id);return view()}
   if(a==='ocultar'){lsSet('tb_x_'+b.dataset.id,'1');if(pin===b.dataset.id)pin=null;return refrescar()}
   if(a==='ver'){pin=b.dataset.id;tab='inicio';window.scrollTo(0,0);return refrescar()}
-  if(a==='iniciar'&&!confirm('Vas a iniciar la partida ahora, sin esperar a que se complete la mesa. Usalo solo en una emergencia. ¿Seguro?'))return;
+  if(a==='iniciar'&&!confirm('Vas a iniciar la partida sin esperar a que se complete la mesa. Empieza una cuenta regresiva y nadie más podrá sentarse. Usalo solo en una emergencia. ¿Seguro?'))return;
   if(a==='aband'&&!confirm('Si abandonás, perdés tus cartones y tu parte del pozo. Si queda un solo jugador, gana por abandono. ¿Seguro?'))return;
   busy=true;msg=null;view();
   try{await accion(a,b)}catch(x){msg={t:'bad',x:(MSG[x.code]||'No se pudo completar. Probá de nuevo.')+(x.code?' ['+x.code+']':'')}}
@@ -448,12 +458,12 @@ async function accion(a,b){
     const mref=doc(db,'mesas',b.dataset.id),n=+pref.n;
     await runTransaction(db,async t=>{
       const d=(await t.get(mref)).data(),costo=n*d.precio;
-      if(d.estado!=='esperando'||d.participantes.includes(u))throw{code:'mesa-cerrada'};
+      if(d.estado!=='esperando'||d.llenaEn||d.participantes.includes(u))throw{code:'mesa-cerrada'};
       if(d.participantes.length>=d.cupo)throw{code:'mesa-llena'};
       if(me.saldo<costo)throw{code:'sin-saldo'};
       const lleno=d.participantes.length+1>=d.cupo,datos={participantes:[...d.participantes,u],pozo:d.pozo+costo,ncart:(d.ncart||0)+n,['nombres.'+u]:me.name};
       if(lleno)datos.llenaEn=serverTimestamp();
-      t.set(doc(db,'mesas',mref.id,'jugadores',u),{uid:u,name:me.name,cartones:Array.from({length:n},()=>({c:carton()}))});
+      t.set(doc(db,'mesas',mref.id,'jugadores',u),{uid:u,name:me.name,cartones:Array.from({length:n},()=>cartonDoc())});
       t.update(mref,datos);
       t.update(uref,{saldo:increment(-costo)});
       t.set(doc(collection(db,'movimientos')),{uid:u,tipo:'compra',monto:-costo,detalle:d.nombre+' · '+n+(n===1?' cartón':' cartones'),creado:serverTimestamp()});
@@ -464,7 +474,7 @@ async function accion(a,b){
     const m=act,n=jug?jug.cartones.length:0,costo=n*m.precio;
     const w=writeBatch(db);
     w.delete(doc(db,'mesas',m.id,'jugadores',u));
-    w.update(doc(db,'mesas',m.id),{participantes:arrayRemove(u),pozo:increment(-costo),ncart:increment(-n),llenaEn:null});
+    w.update(doc(db,'mesas',m.id),{participantes:arrayRemove(u),pozo:increment(-costo),ncart:increment(-n),llenaEn:null,forzada:false});
     w.update(uref,{saldo:increment(costo),mesaSalida:m.id,tipoCobro:null});
     w.set(doc(collection(db,'movimientos')),{uid:u,tipo:'devolucion',monto:costo,detalle:m.nombre,creado:serverTimestamp()});
     await w.commit();
@@ -485,7 +495,8 @@ async function accion(a,b){
     msg={t:'ok',x:'Mesa lista. Elegí tus cartones y sentate para jugar de nuevo.'};
     refrescar();
   }
-  if(a==='iniciar')await updateDoc(doc(db,'mesas',b.dataset.id||act.id),{estado:'jugando',ultimaBola:serverTimestamp()});
+  if(a==='iniciar')await updateDoc(doc(db,'mesas',b.dataset.id||act.id),{llenaEn:serverTimestamp(),forzada:true});
+  if(a==='cancelarInicio')await updateDoc(doc(db,'mesas',b.dataset.id||act.id),{llenaEn:null,forzada:false});
   if(a==='aband'){
     const ref=doc(db,'mesas',act.id);let fin=false,gano=false;
     await runTransaction(db,async t=>{
@@ -592,33 +603,38 @@ setInterval(()=>{
   if(rg)rg.style.strokeDashoffset=String(163.4*(rem/seg));
 },200);
 
-/* ---------- Inicio automático al completarse la mesa ---------- */
-// Cuando se llena el cupo empieza una cuenta regresiva. Al terminar, cualquier jugador de la mesa
-// que esté conectado inicia la partida (no depende del administrador).
-const vistoLleno={},iniciando={},jit2={};
+/* ---------- Inicio automático (mesa completa o inicio de emergencia) ---------- */
+// Cuando se llena el cupo, o el administrador fuerza el inicio, empieza una cuenta regresiva.
+// Al terminar, cualquier jugador conectado de la mesa inicia la partida.
+const vistoLleno={},iniciando={},jit2={},anunciado={};
 const segInicioMs=()=>Math.max(5,+cfg.segInicio||15)*1000;
 const restaInicio=m=>{const v=vistoLleno[m.id]||Date.now();return Math.max(0,Math.ceil((segInicioMs()-(Date.now()-v))/1000))};
+const cuentaActiva=m=>m.estado==='esperando'&&!!m.llenaEn&&(m.participantes.length>=m.cupo||!!m.forzada);
 async function iniciarMesa(m){
   iniciando[m.id]=Date.now();
   try{
     const ref=doc(db,'mesas',m.id);
     await runTransaction(db,async t=>{
       const d=(await t.get(ref)).data();
-      if(d.estado!=='esperando'||d.participantes.length<d.cupo||!d.llenaEn)return;
+      if(d.estado!=='esperando'||!d.llenaEn||!(d.participantes.length>=d.cupo||d.forzada)||d.participantes.length<1)return;
       t.update(ref,{estado:'jugando',ultimaBola:serverTimestamp()});
     });
   }catch(e){}
 }
 setInterval(()=>{
   if(!U)return;
-  mias.forEach(m=>{
-    if(m.estado!=='esperando'||m.participantes.length<m.cupo||!m.llenaEn){delete vistoLleno[m.id];return}
+  const todas=new Map();[...mias,...hosted].forEach(m=>todas.set(m.id,m));
+  todas.forEach(m=>{
+    if(!cuentaActiva(m)){delete vistoLleno[m.id];delete anunciado[m.id];return}
     if(!vistoLleno[m.id]){vistoLleno[m.id]=Date.now();view()}
     if(jit2[m.id]===undefined)jit2[m.id]=Math.floor(Math.random()*1500);
     if(Date.now()-vistoLleno[m.id]>=segInicioMs()+jit2[m.id]&&Date.now()-(iniciando[m.id]||0)>4000)iniciarMesa(m);
   });
-  const el=document.getElementById('cdi');if(act&&el)el.textContent=restaInicio(act);
-},500);
+  if(act&&cuentaActiva(act)){
+    const r=restaInicio(act),el=document.getElementById('cdi');if(el)el.textContent=r;
+    if(r>=1&&r<=5&&anunciado[act.id]!==r){anunciado[act.id]=r;sonar('tick');const t=decirCuenta(r);if(t)hablarTexto(t)}
+  }
+},400);
 </script>
 </body>
 </html>
