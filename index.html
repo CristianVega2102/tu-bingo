@@ -334,7 +334,7 @@ function esperaView(m){
   const txt=encodeURIComponent(`Te espero en ${m.nombre} de TU BINGO. Cartón: ${fmt(m.precio)}. ${location.href}`);
   return `<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="chip">${n}/${m.cupo}</span></div>
     <p class="note">Premios: ${pLabel(m)} · Cartón ${fmt(m.precio)} · Organiza: ${esc(m.anfitrionNombre||'')}</p>
-    <div class="row"><span>Pozo acumulado${(cfg.comision||0)>0?' (neto de comisión)':''}</span><b class="mono gold" style="font-size:24px">${fmt(pozoNeto(m))}</b></div></div>
+    <div class="row"><span>Pozo acumulado</span><b class="mono gold" style="font-size:24px">${fmt(pozoNeto(m))}</b></div></div>
   <div class="card"><h2>Jugadores sentados</h2>${n?`<ul>${m.participantes.map(u=>`<li>${esc((m.nombres||{})[u]||'Jugador')}${u===m.anfitrion?' (anfitrión)':''}</li>`).join('')}</ul>`:'<p class="note">Todavía no se sentó nadie.</p>'}
     ${soy&&jug?`<p class="note">Tus cartones: ${jug.cartones.length}</p>`:''}</div>
   ${!soy&&!m.llenaEn?`<div class="card"><h2>Sentate en la mesa</h2>${unirseCtl(m)}</div>`:''}
