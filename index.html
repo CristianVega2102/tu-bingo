@@ -90,6 +90,15 @@ details.card summary{cursor:pointer;font-family:var(--f);font-weight:600;font-si
 .pnl{background:var(--p);border:1px solid var(--line);border-radius:20px;padding:16px;width:100%;max-width:440px;display:flex;flex-direction:column;gap:10px;max-height:92dvh;overflow:auto}
 .wn{display:grid;grid-template-columns:92px 1fr auto;gap:8px;align-items:center;background:var(--p2);border-radius:12px;padding:10px;font-size:14px}.wn>span:first-child{font-family:var(--f);color:var(--gold);font-size:13px}
 .det{display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:14px;border-top:1px solid var(--line);padding-top:10px}.det span{color:var(--mute)}
+.top.ns{position:static;background:none;padding:10px 0 2px}
+.flot{position:sticky;top:6px;z-index:7;display:flex;align-items:center;gap:10px;padding:6px 10px;background:linear-gradient(#0c241b,#081811);border:1px solid #2d5a46;border-radius:16px;box-shadow:0 6px 18px rgba(0,0,0,.55);color:#e9f3ec}
+.fb{width:46px;height:46px;flex:none;border-radius:50%;display:grid;place-items:center;font-family:var(--f);font-weight:700;font-size:23px;color:#4a3000;background:radial-gradient(circle at 35% 30%,#ffe9a0,#f2c14e 55%,#b8860b);box-shadow:0 0 0 2px #7a5a10;animation:pop .35s ease-out}
+.fi{flex:1;min-width:0}.ft{font-family:var(--f);font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fp{display:flex;align-items:center;gap:4px;margin-top:3px}.fn{font-size:11px;font-weight:800;color:#f2c14e;margin-right:2px}
+.pm{width:22px;height:22px;border-radius:50%;border:1.5px solid #2f7a55;display:grid;place-items:center;font-family:var(--f);font-weight:600;font-size:11px;color:#9ff0c4;background:#0d2a1e}
+.fr{position:relative;width:40px;height:40px;flex:none}.fr svg{width:40px;height:40px;transform:rotate(-90deg)}.fr .rb,.fr .rf{stroke-width:7}
+.fr b{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--f);font-size:10px;color:#e9f3ec}
+.fr.fin{display:grid;place-items:center;font-size:22px}
 </style>
 </head>
 <body>
@@ -101,7 +110,7 @@ import {getAuth,onAuthStateChanged,createUserWithEmailAndPassword,signInWithEmai
 import {getFirestore,doc,getDoc,setDoc,addDoc,updateDoc,deleteDoc,onSnapshot,collection,query,where,writeBatch,runTransaction,serverTimestamp,arrayUnion,arrayRemove,increment} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {firebaseConfig} from "./config.js";
 
-const VERSION='2026-10-27 · v8';
+const VERSION='2026-10-27 · v10';
 const A=document.getElementById('app'),NAV=document.getElementById('nav');
 const fmt=n=>'$'+Math.round(n||0).toLocaleString('es-AR');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -135,7 +144,7 @@ function sonar(n,extra=0){
 }
 
 /* ---------- Estado ---------- */
-let U=null,me=null,cfg={precioCarton:500,comision:0,pctQuintina:30,pctBingo:70,segBola:6,segInicio:15,whatsapp:''};
+let elim=false,U=null,me=null,cfg={precioCarton:500,comision:0,pctQuintina:30,pctBingo:70,segBola:6,segInicio:15,whatsapp:''};
 let abiertas=[],mias=[],hosted=[],movs=[],act=null,jug=null,unsubs=[],unJug=null,unJugKey='';
 let pin=null,tab='inicio',modo='in',msg=null,busy=false,online=navigator.onLine,pS=null,MK={};
 const pref={prem:'ambos',cupo:'10',n:'1'};
@@ -147,10 +156,11 @@ let voz=lsGet('tb_voz')!=='0',auto=lsGet('tb_auto')==='1';const abiertos=new Set
 
 onAuthStateChanged(auth,u=>{
   unsubs.forEach(f=>f());unsubs=[];if(unJug)unJug();unJug=null;unJugKey='';
-  U=u;me=null;abiertas=[];mias=[];hosted=[];movs=[];act=null;jug=null;pS=null;MK={};
+  U=u;me=null;elim=false;abiertas=[];mias=[];hosted=[];movs=[];act=null;jug=null;pS=null;MK={};
   if(u){
     const lista=(q,fn)=>unsubs.push(onSnapshot(q,s=>{fn(s.docs.map(d=>({id:d.id,...d.data({serverTimestamps:'estimate'})})));refrescar()}));
     unsubs.push(onSnapshot(doc(db,'users',u.uid),s=>{me=s.exists()?s.data():null;view()}));
+    unsubs.push(onSnapshot(doc(db,'bloqueados',u.uid),s=>{elim=s.exists();view()}));
     unsubs.push(onSnapshot(doc(db,'config','general'),s=>{if(s.exists())cfg={...cfg,...s.data()};view()}));
     unsubs.push(onSnapshot(query(collection(db,'movimientos'),where('uid','==',u.uid)),s=>{movs=s.docs.map(d=>d.data({serverTimestamps:'estimate'}));view()}));
     lista(query(collection(db,'mesas'),where('estado','==','esperando')),l=>abiertas=l);
@@ -210,6 +220,7 @@ function marks(id,i){
   return MK[id][i]||[];
 }
 function toggle(id,i,n){const s=new Set(marks(id,i));s.has(n)?s.delete(n):s.add(n);MK[id][i]=[...s].sort((a,b)=>a-b);lsSet(mkKey(id),JSON.stringify(MK[id]))}
+const pozoNeto=m=>m.pozo*(100-(cfg.comision||0))/100;
 const premios=m=>{
   const k=m.pozo*(100-(cfg.comision||0)),pb=m.premios==='ambos'?cfg.pctBingo:cfg.pctQuintina+cfg.pctBingo;
   return{q:Math.floor(k*cfg.pctQuintina/10000),b:Math.floor(k*pb/10000)};
@@ -255,6 +266,7 @@ const mejorFila=(c,mk)=>{let best=0,bn=-1;for(let r=0;r<3;r++){let n=0;for(let j
 function view(){
   const y=window.scrollY;
   if(!U){NAV.style.display='none';A.innerHTML=authView();return}
+  if(!me&&elim){NAV.style.display='none';A.innerHTML='<div class="card" style="margin-top:20px"><h1>Cuenta eliminada</h1><p>El administrador eliminó esta cuenta.</p><button class="b3" data-a="salir">Salir</button></div>';return}
   if(!me){NAV.style.display='none';A.innerHTML='<div class="card" style="margin-top:20px"><p>Cargando tu cuenta…</p></div><div class="load"></div>';return}
   NAV.style.display='flex';
   const T=[['inicio','🏠','Inicio'],['jugar','🎲','Jugar'],['saldo','💰','Saldo'],['cuenta','👤','Cuenta']];
@@ -264,7 +276,8 @@ function view(){
   window.scrollTo(0,y);
 }
 function header(){
-  return `<div class="top"><div class="logo">TU <b>BINGO</b></div><div class="row"><span title="${online?'Conectado':'Sin conexión'}" role="img" aria-label="${online?'Conectado':'Sin conexión'}"><span class="dot ${online?'on':''}"></span></span><span class="chip">${fmt(me.saldo)}</span></div></div>`
+  const enJuego=tab==='inicio'&&act&&act.estado!=='esperando';
+  return `<div class="top ${enJuego?'ns':''}"><div class="logo">TU <b>BINGO</b></div><div class="row"><span title="${online?'Conectado':'Sin conexión'}" role="img" aria-label="${online?'Conectado':'Sin conexión'}"><span class="dot ${online?'on':''}"></span></span><span class="chip">${fmt(me.saldo)}</span></div></div>`
     +(busy?'<div class="load"></div>':'')+(msg?`<div class="msg ${msg.t}" role="alert" data-a="cerrarMsg">${esc(msg.x)} <span class="note">(tocá para cerrar)</span></div>`:'');
 }
 function authView(){
@@ -304,7 +317,7 @@ function finPanel(m){
     <h2>🏁 Partida finalizada</h2><p class="note">${esc(m.nombre)} · ${pLabel(m)}</p>
     ${gane?'<div class="msg ok">¡Felicitaciones, ganaste!</div>':(part?'<p class="note">Esta vez no ganaste. ¡Suerte en la próxima!</p>':'')}
     ${m.premios==='ambos'?fila('QUINTINA',gq):''}${fila('BINGO',gb)}
-    <div class="det"><span>Pozo</span><b>${fmt(m.pozo)}</b><span>Jugadores</span><b>${m.participantes.length}</b><span>Cartones</span><b>${m.ncart||0}</b><span>Bolillas sorteadas</span><b>${s.length}/90</b><span>Última bolilla</span><b>${s.length?s[s.length-1]:'—'}</b></div>
+    <div class="det"><span>Pozo (comisión descontada)</span><b>${fmt(pozoNeto(m))}</b><span>Jugadores</span><b>${m.participantes.length}</b><span>Cartones</span><b>${m.ncart||0}</b><span>Bolillas sorteadas</span><b>${s.length}/90</b><span>Última bolilla</span><b>${s.length?s[s.length-1]:'—'}</b></div>
     ${mios.map(x=>`<button class="b1" data-a="cobrar" data-t="${x.t}" data-id="${m.id}" ${busy?'disabled':''}>Cobrar ${x.t==='q'?'Quintina':'Bingo'} · ${fmt(x.g.premio)}</button>`).join('')}
     ${part?`<button class="b2" data-a="revancha" data-id="${m.id}" ${busy?'disabled':''}>🔁 Jugar de nuevo en esta mesa</button>`:''}
     <div class="acts"><button class="b3" data-a="cerrarPanel" data-id="${m.id}">Ver la mesa</button><button class="b3" data-a="ocultar" data-id="${m.id}">Salir</button></div>
@@ -321,7 +334,7 @@ function esperaView(m){
   const txt=encodeURIComponent(`Te espero en ${m.nombre} de TU BINGO. Cartón: ${fmt(m.precio)}. ${location.href}`);
   return `<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="chip">${n}/${m.cupo}</span></div>
     <p class="note">Premios: ${pLabel(m)} · Cartón ${fmt(m.precio)} · Organiza: ${esc(m.anfitrionNombre||'')}</p>
-    <div class="row"><span>Pozo acumulado</span><b class="mono gold" style="font-size:24px">${fmt(m.pozo)}</b></div></div>
+    <div class="row"><span>Pozo acumulado${(cfg.comision||0)>0?' (neto de comisión)':''}</span><b class="mono gold" style="font-size:24px">${fmt(pozoNeto(m))}</b></div></div>
   <div class="card"><h2>Jugadores sentados</h2>${n?`<ul>${m.participantes.map(u=>`<li>${esc((m.nombres||{})[u]||'Jugador')}${u===m.anfitrion?' (anfitrión)':''}</li>`).join('')}</ul>`:'<p class="note">Todavía no se sentó nadie.</p>'}
     ${soy&&jug?`<p class="note">Tus cartones: ${jug.cartones.length}</p>`:''}</div>
   ${!soy&&!m.llenaEn?`<div class="card"><h2>Sentate en la mesa</h2>${unirseCtl(m)}</div>`:''}
@@ -344,12 +357,12 @@ function juegoView(m){
   const s=m.sorteadas,ult=s[s.length-1],pr=premios(m),gq=m.ganQuintina,gb=m.ganBingo,yoAb=(m.abandonaron||[]).includes(U.uid),part=m.participantes.includes(U.uid)&&!yoAb,jugando=m.estado==='jugando';
   const cobro=(g,t,n)=>g&&g.uid===U.uid&&!g.pagado?`<button class="b1" data-a="cobrar" data-t="${t}" data-id="${m.id}" ${busy?'disabled':''}>Cobrar ${n} · ${fmt(g.premio)}</button>`:'';
   const nom=ult&&NOMBRES[ult];
-  const bol=`<div class="live"><div class="row"><span class="lt"><i class="ld"></i>BOLILLERO CENTRAL EN VIVO</span><button class="voz ${voz?'on':''}" data-a="voz" aria-pressed="${voz}">🔊 ¡Voz Criolla!</button></div>
-    <div class="bl"><div class="bolaoro" aria-live="polite">${ult||'—'}</div>
-      <div class="binfo"><div class="up">ÚLTIMA BOLA <span class="nb">#${s.length}</span></div><div class="tt">${ult?ult+(nom?' - ¡'+esc(nom)+'!':''):'Esperando…'}</div>${ult?`<div class="it">“${cap(enLetras(ult))}”</div>`:''}</div>
-      ${jugando?`<div class="ringw"><svg viewBox="0 0 64 64" aria-hidden="true"><circle class="rb" cx="32" cy="32" r="26"/><circle id="ring" class="rf" cx="32" cy="32" r="26" stroke-dasharray="163.4" stroke-dashoffset="163.4"/></svg><b id="sig">…</b><span>Siguiente</span></div>`:''}</div>
-    <div class="ant"><span>ANTERIORES:</span>${s.slice(-7,-1).reverse().map((n,j)=>`<span class="pb" style="opacity:${1-j*.13}">${pad(n)}</span>`).join('')}</div>
-    ${jugando?`<p class="nt" style="text-align:center">${sorteoErr?'<span style="color:#ff9fb0">Sorteo detenido ('+esc(sorteoErr)+'). </span><button class="ver" data-a="reintentar">Reintentar</button>':'Las bolillas salen solas cada '+(cfg.segBola||6)+' segundos.'}</p>`:''}${jugando&&m.participantes.includes(U.uid)&&!yoAb?'<button class="aband" data-a="aband">🚪 Salir / abandonar mesa</button>':''}${m.estado==='terminada'?`<p class="nt" style="text-align:center">🏁 Sorteo finalizado${gb?': BINGO de '+esc(gb.nombre)+(gb.abandono?' (por abandono)':''):''}.</p>`:''}</div>`;
+  const prev=s.slice(-6,-1).reverse();
+  const barra=`<div class="flot"><div class="fb" aria-live="polite" aria-label="${ult?'Última bolilla '+ult:'Sin bolillas todavía'}">${ult||'—'}</div>
+    <div class="fi"><div class="ft">${ult?ult+(nom?' · ¡'+esc(nom)+'!':''):'Esperando la primera bolilla…'}</div><div class="fp"><span class="fn">#${s.length}</span>${prev.map((n,j)=>`<span class="pm" style="opacity:${1-j*.15}">${pad(n)}</span>`).join('')}</div></div>
+    ${jugando?`<div class="fr" title="Siguiente bolilla"><svg viewBox="0 0 64 64" aria-hidden="true"><circle class="rb" cx="32" cy="32" r="26"/><circle id="ring" class="rf" cx="32" cy="32" r="26" stroke-dasharray="163.4" stroke-dashoffset="163.4"/></svg><b id="sig">…</b></div>`:'<div class="fr fin" aria-hidden="true">🏁</div>'}</div>`;
+  const ctl=`<div class="row" style="gap:8px;flex-wrap:wrap;justify-content:flex-start"><button class="voz ${voz?'on':''}" data-a="voz" aria-pressed="${voz}">🔊 ¡Voz Criolla!</button>${jugando&&m.participantes.includes(U.uid)&&!yoAb?'<button class="aband" data-a="aband">🚪 Salir / abandonar</button>':''}</div>
+    ${jugando?`<p class="note">${sorteoErr?'<span style="color:#ff9fb0">Sorteo detenido ('+esc(sorteoErr)+'). </span><button class="ver" data-a="reintentar">Reintentar</button>':'Las bolillas salen solas cada '+(cfg.segBola||6)+' segundos.'}</p>`:''}${m.estado==='terminada'?`<p class="note">🏁 Sorteo finalizado${gb?': BINGO de '+esc(gb.nombre)+(gb.abandono?' (por abandono)':''):''}.</p>`:''}`;
   const prem=`<div class="prem">${m.premios==='ambos'?`<div class="${gq?'g':''}">QUINTINA<b>${fmt(gq?gq.premio:pr.q)}</b><span class="note">${gq?'Ganó '+esc(gq.nombre):'Disponible'}</span></div>`:''}<div class="${gb?'g':''}" ${m.premios==='ambos'?'':'style="grid-column:1/-1"'}>BINGO<b>${fmt(gb?gb.premio:pr.b)}</b><span class="note">${gb?'Ganó '+esc(gb.nombre)+(gb.abandono?' por abandono':''):'Disponible'}</span></div></div>`;
   let hint='';
   if(part&&jug&&jugando){
@@ -365,13 +378,13 @@ function juegoView(m){
   const cant=part&&jug&&jugando?`<div class="cant">${m.premios==='ambos'&&!gq?`<button class="cq" data-a="recl" data-t="q" ${busy?'disabled':''}>¡Quintina!</button>`:''}${!gb?`<button class="cb" data-a="recl" data-t="b" ${busy?'disabled':''}>¡Bingo!</button>`:''}</div>`:'';
   const cards=yoAb&&jugando?`<div class="card"><b>Abandonaste esta mesa.</b><p class="note">Tus cartones ya no participan.</p><button class="b3" data-a="ocultar" data-id="${m.id}">Salir de la mesa</button></div>`:part?(jug?`<div class="row"><h2>Tus cartones (${jug.cartones.length})</h2><label class="sw">Auto-Marcado <button class="swb ${auto?'on':''}" data-a="auto" role="switch" aria-checked="${auto}" aria-label="Auto-marcado"><i></i></button></label></div>${hint}${cant}${jug.cartones.map((k,i)=>cartonHTML(m,i,k,ult)).join('')}`:'<div class="card"><p>Cargando tus cartones…</p></div>'):'';
   const fin=m.estado==='terminada'?`<div class="card"><b>La partida terminó.</b><button class="b3" data-a="ocultar" data-id="${m.id}">Salir de la mesa</button><p class="note">Si ganaste y todavía no cobraste, tu premio queda en Inicio y en Mi saldo.</p></div>`:'';
-  return `${bol}${prem}${fin}${cobro(gq,'q','Quintina')}${cobro(gb,'b','Bingo')}${cards}
-  <details class="card"><summary>Tablero de 90 números</summary><div class="t90" style="margin-top:10px">${Array.from({length:90},(_,i)=>i+1).map(n=>s.includes(n)?`<span class="t s" style="background:${col(n)}">${n}</span>`:`<span class="t">${n}</span>`).join('')}</div></details>${finPanel(m)}`;
+  return `${barra}${ctl}${prem}${fin}${cobro(gq,'q','Quintina')}${cobro(gb,'b','Bingo')}${cards}
+  <div class="card"><h2>Tablero de 90 números</h2><div class="t90">${Array.from({length:90},(_,i)=>i+1).map(n=>s.includes(n)?`<span class="t s" style="background:${col(n)}">${n}</span>`:`<span class="t">${n}</span>`).join('')}</div></div>${finPanel(m)}`;
 }
 function mesasAbiertas(ocupado){
   const lista=abiertas.filter(m=>(m.participantes.length<m.cupo&&!m.llenaEn)||m.participantes.includes(U.uid));
   return '<h2>Mesas disponibles</h2>'+(lista.length?lista.map(m=>`<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="chip">${m.participantes.length}/${m.cupo}</span></div>
-    <p class="note">${pLabel(m)} · Cartón ${fmt(m.precio)} · Pozo ${fmt(m.pozo)}</p>
+    <p class="note">${pLabel(m)} · Cartón ${fmt(m.precio)} · Pozo ${fmt(pozoNeto(m))}</p>
     ${ocupado||(act&&act.estado!=='terminada')||m.participantes.includes(U.uid)?'<p class="note">Ya estás en una mesa.</p>':unirseCtl(m)}</div>`).join(''):'<div class="card"><p class="note">Por ahora no hay mesas disponibles. El administrador las va a abrir.</p></div>');
 }
 function jugarView(){
@@ -385,7 +398,7 @@ function jugarView(){
       <p class="note">Cartón: ${fmt(cfg.precioCarton)}. La partida empieza sola cuando se completa el cupo, con una cuenta regresiva. Una vez iniciada, nadie más puede sumarse.</p>
       <button class="b1" data-a="crear" ${busy?'disabled':''}>Crear mesa</button></div>`;
     if(mias.length)h+='<h2>Mis mesas</h2>'+mias.map(m=>`<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="chip">${m.participantes.length}/${m.cupo}</span></div>
-      <p class="note">${m.estado==='esperando'?'Esperando jugadores':'En juego · '+m.sorteadas.length+' bolillas'} · ${pLabel(m)} · Pozo ${fmt(m.pozo)}</p>
+      <p class="note">${m.estado==='esperando'?'Esperando jugadores':'En juego · '+m.sorteadas.length+' bolillas'} · ${pLabel(m)} · Pozo ${fmt(pozoNeto(m))}</p>
       <div class="acts"><button class="b3" data-a="ver" data-id="${m.id}">Abrir</button>${m.estado==='esperando'&&m.participantes.length>=1&&!m.llenaEn?`<button class="b3" data-a="iniciar" data-id="${m.id}" ${busy?'disabled':''}>⚠️ Iniciar (emergencia)</button>`:''}${m.estado==='esperando'&&m.forzada&&m.llenaEn?`<button class="b3" data-a="cancelarInicio" data-id="${m.id}" ${busy?'disabled':''}>Cancelar inicio</button>`:''}${m.estado==='esperando'&&m.participantes.length===0?`<button class="b4" data-a="cancelar" data-id="${m.id}" ${busy?'disabled':''}>Cancelar</button>`:''}</div></div>`).join('');
   }
   return h+mesasAbiertas(ocupado);

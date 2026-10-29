@@ -30,7 +30,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:2
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {getFirestore,doc,onSnapshot,collection,query,orderBy,limit,setDoc,writeBatch,increment,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getFirestore,doc,onSnapshot,getDocs,where,collection,query,orderBy,limit,setDoc,writeBatch,increment,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {firebaseConfig} from "./config.js";
 
 const A=document.getElementById('app');
@@ -39,17 +39,16 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 if(!firebaseConfig.apiKey||String(firebaseConfig.apiKey).startsWith('PEGAR')){A.innerHTML='<div class="card"><h1>Administrador</h1><p>Falta pegar la configuración de Firebase en <b>config.js</b>.</p></div>';throw new Error('Falta config.js')}
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
 const ts=t=>t&&t.toDate?t.toDate().toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'}):'';
-let U=null,me=null,cfg={precioCarton:500,comision:0,pctQuintina:30,pctBingo:70,segBola:6,segInicio:15,whatsapp:''},us=[],rz=[],ms=[],q='',err='',ok='',unsubs=[];
+let U=null,me=null,cfg={precioCarton:500,comision:0,pctQuintina:30,pctBingo:70,segBola:6,segInicio:15,whatsapp:''},us=[],ms=[],q='',err='',ok='',unsubs=[];
 
 onAuthStateChanged(auth,u=>{
-  unsubs.forEach(f=>f());unsubs=[];U=u;me=null;us=[];rz=[];ms=[];
+  unsubs.forEach(f=>f());unsubs=[];U=u;me=null;us=[];ms=[];
   if(u){
     unsubs.push(onSnapshot(doc(db,'users',u.uid),s=>{
       const was=me&&me.admin;me=s.exists()?s.data():null;
       if(me&&me.admin&&!was){
         unsubs.push(onSnapshot(collection(db,'users'),s=>{us=s.docs.map(d=>({id:d.id,...d.data()}));lista()}));
-        unsubs.push(onSnapshot(query(collection(db,'rechazos'),orderBy('creado','desc'),limit(20)),s=>{rz=s.docs.map(d=>d.data());extras()}));
-        unsubs.push(onSnapshot(query(collection(db,'mesas'),orderBy('creada','desc'),limit(15)),s=>{ms=s.docs.map(d=>d.data());extras()}));
+        unsubs.push(onSnapshot(query(collection(db,'mesas'),orderBy('creada','desc'),limit(15)),s=>{ms=s.docs.map(d=>({id:d.id,...d.data()}));extras()}));
         unsubs.push(onSnapshot(doc(db,'config','general'),s=>{if(s.exists())cfg={...cfg,...s.data()};view()}));
       }
       view();
@@ -76,8 +75,7 @@ function view(){
     ${err?`<div class="err">${err}</div>`:''}${ok?`<div class="okm">${ok}</div>`:''}
     <button class="b1">Guardar configuración</button></form>
   <div class="card"><h2>Jugadores</h2><div class="note" id="cont"></div><input id="q" placeholder="Buscar por nombre o código" value="${esc(q)}" aria-label="Buscar jugador"><div id="lista"></div></div>
-  <div class="card"><h2>Reclamos rechazados</h2><div id="rz"></div></div>
-  <div class="card"><h2>Últimas mesas y resultados</h2><div id="ms"></div></div>`;
+  <div class="card"><div class="row"><h2>Últimas mesas y resultados</h2><button class="b2" data-a="hist">🗑️ Eliminar historial</button></div><p class="note">El pozo se muestra con la comisión ya descontada.</p><div id="ms"></div></div>`;
   lista();extras();
 }
 function lista(){
@@ -86,13 +84,11 @@ function lista(){
   const l=us.filter(u=>!t||(u.name||'').toLowerCase().includes(t)||u.id.slice(0,6).toLowerCase().includes(t)).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   const ct=document.getElementById('cont');if(ct)ct.textContent=us.length+' registrados';
   el.innerHTML=l.length?l.map(u=>`<div class="u"><div class="row"><b>${esc(u.name||'?')}${u.admin?' (admin)':''}</b><span class="mono gold">${fmt(u.saldo)}</span></div><span class="note">Código ${u.id.slice(0,6)}</span>
-    <div class="row"><input id="m-${u.id}" type="number" min="1" step="1" placeholder="Monto" aria-label="Monto para ${esc(u.name||'')}"><button class="b1" data-a="cred" data-u="${u.id}">Acreditar</button><button class="b2" data-a="deb" data-u="${u.id}">Debitar</button></div></div>`).join(''):'<p class="note">No hay jugadores con ese dato.</p>';
+    <div class="row"><input id="m-${u.id}" type="number" min="1" step="1" placeholder="Monto" aria-label="Monto para ${esc(u.name||'')}"><button class="b1" data-a="cred" data-u="${u.id}">Acreditar</button><button class="b2" data-a="deb" data-u="${u.id}">Debitar</button></div>${u.admin||u.id===U.uid?'':`<button class="b3" style="color:var(--bad);align-self:flex-start" data-a="del" data-u="${u.id}">🗑️ Eliminar usuario</button>`}</div>`).join(''):'<p class="note">No hay jugadores con ese dato.</p>';
 }
 function extras(){
-  const r=document.getElementById('rz');
-  if(r)r.innerHTML=rz.length?rz.map(x=>`<div class="mv"><b>${esc(x.nombre||'?')} · ${esc(x.premio||'')} · cartón ${esc(x.carton||'')}</b><span>${esc(x.motivo||'')}</span>${x.diag?'<span class="note" style="word-break:break-all">'+esc(x.diag)+'</span>':''}<span class="note">${esc(x.mesaNombre||'')} · ${ts(x.creado)}</span></div>`).join(''):'<p class="note">No hay reclamos rechazados.</p>';
   const m=document.getElementById('ms');
-  if(m)m.innerHTML=ms.length?ms.map(x=>`<div class="mv"><b>${esc(x.nombre)} · ${esc(x.estado)}</b><span>Pozo ${fmt(x.pozo)} · ${x.participantes?x.participantes.length:0} jugadores · ${x.premios==='ambos'?'Quintina y Bingo':'Solo Bingo'}</span>
+  if(m)m.innerHTML=ms.length?ms.map(x=>`<div class="mv"><b>${esc(x.nombre)} · ${esc(x.estado)}</b><span>Pozo ${fmt(x.pozo*(100-(cfg.comision||0))/100)} · ${x.participantes?x.participantes.length:0} jugadores · ${x.premios==='ambos'?'Quintina y Bingo':'Solo Bingo'}</span>
     ${x.ganQuintina?`<span>Quintina: ${esc(x.ganQuintina.nombre)} (${fmt(x.ganQuintina.premio)}${x.ganQuintina.pagado?', cobrado':', sin cobrar'})</span>`:''}
     ${x.ganBingo?`<span>Bingo: ${esc(x.ganBingo.nombre)} (${fmt(x.ganBingo.premio)}${x.ganBingo.pagado?', cobrado':', sin cobrar'})</span>`:''}
     <span class="note">${ts(x.creada)}</span></div>`).join(''):'<p class="note">Todavía no hay mesas.</p>';
@@ -115,6 +111,34 @@ document.addEventListener('submit',async e=>{
 document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a;
   if(a==='salir')return signOut(auth);
+  if(a==='hist'){
+    if(!confirm('Se van a borrar las mesas terminadas cuyos premios ya fueron cobrados (o que no tuvieron ganador), con sus cartones. No se puede deshacer. ¿Seguro?'))return;
+    b.disabled=true;
+    try{
+      const snap=await getDocs(query(collection(db,'mesas'),where('estado','==','terminada')));
+      const borrar=snap.docs.filter(d=>{const x=d.data();return (!x.ganQuintina||x.ganQuintina.pagado)&&(!x.ganBingo||x.ganBingo.pagado)});
+      let n=0;
+      for(const d of borrar){
+        const js=await getDocs(collection(db,'mesas',d.id,'jugadores')),w=writeBatch(db);
+        js.docs.forEach(j=>w.delete(j.ref));w.delete(d.ref);await w.commit();n++;
+      }
+      alert(n?'Se borraron '+n+(n===1?' mesa':' mesas')+' del historial.':'No había mesas terminadas para borrar (o tienen premios sin cobrar).');
+    }catch(x){alert('No se pudo borrar el historial.')}
+    b.disabled=false;return;
+  }
+  if(a==='del'){
+    const u=us.find(x=>x.id===b.dataset.u);if(!u||u.admin||u.id===U.uid)return;
+    if(!confirm('Eliminar a '+u.name+'? Se borran sus datos y su saldo ('+fmt(u.saldo||0)+'). Ya no podrá volver a registrarse con ese correo. Si está sentado en una mesa, sacalo antes. No se puede deshacer.'))return;
+    b.disabled=true;
+    try{
+      const w=writeBatch(db);
+      w.delete(doc(db,'users',u.id));
+      w.set(doc(db,'bloqueados',u.id),{nombre:u.name,por:me.name,creado:serverTimestamp()});
+      if((u.saldo||0)>0)w.set(doc(collection(db,'movimientos')),{uid:u.id,tipo:'retiro',monto:-(u.saldo),detalle:'Cuenta eliminada por el administrador',por:me.name,creado:serverTimestamp()});
+      await w.commit();
+    }catch(x){alert('No se pudo eliminar al usuario.');b.disabled=false}
+    return;
+  }
   const id=b.dataset.u,n=Math.floor(+document.getElementById('m-'+id).value);
   if(!(n>0))return;
   const u=us.find(x=>x.id===id),sg=a==='cred'?1:-1;
