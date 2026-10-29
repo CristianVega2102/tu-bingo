@@ -341,7 +341,11 @@ function unirseCtl(m){
 function esperaView(m){
   const soy=m.participantes.includes(U.uid),host=m.anfitrion===U.uid,n=m.participantes.length;
   const txt=encodeURIComponent(`Te espero en ${m.nombre} de TU BINGO. Cartón: ${fmt(m.precio)}. ${location.href}`);
-  return `<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="chip">${n}/${m.cupo}</span></div>
+  return `<div class="card"><div class="row"><div>
+  <h2 style="font-size: 20px; margin-bottom: 2px;">${esc(m.nombre)}</h2>
+  <span class="note" style="color: var(--gold); font-weight: 700;">${esc(m.subtitulo || ('Mesa #' + m.id.slice(0,4)))}</span>
+</div>
+<span class="chip">${n}/${m.cupo}</span></div>
     <p class="note">Premios: ${pLabel(m)} · Cartón ${fmt(m.precio)} · Organiza: ${esc(m.anfitrionNombre||'')}</p>
     <div class="row"><span>Pozo acumulado</span><b class="mono gold" style="font-size:24px">${fmt(pozoNeto(m))}</b></div></div>
   <div class="card"><h2>Jugadores sentados</h2>${n?`<ul>${m.participantes.map(u=>`<li>${esc((m.nombres||{})[u]||'Jugador')}${u===m.anfitrion?' (anfitrión)':''}</li>`).join('')}</ul>`:'<p class="note">Todavía no se sentó nadie.</p>'}
@@ -404,14 +408,19 @@ function mesasAbiertas(ocupado){
 function jugarView(){
   const ocupado=act&&act.estado!=='terminada';
   let h=ocupado?`<div class="card"><b>Ya estás en la mesa ${esc(act.nombre)}.</b><button class="b3" data-a="tab" data-v="inicio">Ir a mi mesa</button></div>`:'';
-  if(me.admin){
+    if(me.admin){
     const mias=hosted.filter(m=>m.estado!=='terminada'&&!oculta(m.id));
     h+=`<div class="card"><h2>Armar mesa (administrador)</h2>
+      <label class="note">Título de la mesa<input id="mtitulo" type="text" placeholder="Ej. Bingo Familiar, Sorteo Nocturno..." maxlength="30" autocomplete="off"></label>
       <label class="note">Premios<select data-pref="prem"><option value="ambos" ${pref.prem==='ambos'?'selected':''}>Quintina y Bingo</option><option value="bingo" ${pref.prem==='bingo'?'selected':''}>Solo Bingo</option></select></label>
       <label class="note">Cantidad máxima de jugadores<select data-pref="cupo">${Array.from({length:49},(_,i)=>i+2).map(n=>`<option value="${n}" ${pref.cupo==n?'selected':''}>${n} jugadores</option>`).join('')}</select></label>
       <p class="note">Cartón: ${fmt(cfg.precioCarton)}. La partida empieza sola cuando se completa el cupo, con una cuenta regresiva. Una vez iniciada, nadie más puede sumarse.</p>
       <button class="b1" data-a="crear" ${busy?'disabled':''}>Crear mesa</button></div>`;
-    if(mias.length)h+='<h2>Mis mesas</h2>'+mias.map(m=>`<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="chip">${m.participantes.length}/${m.cupo}</span></div>
+ if(mias.length)h+='<h2>Mis mesas</h2>'+mias.map(m=>`<div class="card"><div class="row"><div>
+  <h2 style="font-size: 20px; margin-bottom: 2px;">${esc(m.nombre)}</h2>
+  <span class="note" style="color: var(--gold); font-weight: 700;">${esc(m.subtitulo || ('Mesa #' + m.id.slice(0,4)))}</span>
+</div>
+<span class="chip">${m.participantes.length}/${m.cupo}</span></div>
       <p class="note">${m.estado==='esperando'?'Esperando jugadores':'En juego · '+m.sorteadas.length+' bolillas'} · ${pLabel(m)} · Pozo ${fmt(pozoNeto(m))}</p>
       <div class="acts"><button class="b3" data-a="ver" data-id="${m.id}">Abrir</button>${m.estado==='esperando'&&m.participantes.length>=1&&!m.llenaEn?`<button class="b3" data-a="iniciar" data-id="${m.id}" ${busy?'disabled':''}>⚠️ Iniciar (emergencia)</button>`:''}${m.estado==='esperando'&&m.forzada&&m.llenaEn?`<button class="b3" data-a="cancelarInicio" data-id="${m.id}" ${busy?'disabled':''}>Cancelar inicio</button>`:''}${m.estado==='esperando'&&m.participantes.length===0?`<button class="b4" data-a="cancelar" data-id="${m.id}" ${busy?'disabled':''}>Cancelar</button>`:''}</div></div>`).join('');
   }
@@ -477,8 +486,40 @@ document.addEventListener('click',async e=>{
 
 async function accion(a,b){
   const u=U.uid,uref=doc(db,'users',u);
-  if(a==='crear'){
-    await addDoc(collection(db,'mesas'),{nombre:'Mesa #'+(100+Math.floor(Math.random()*900)),anfitrion:u,anfitrionNombre:me.name,premios:pref.prem,cupo:+pref.cupo,precio:cfg.precioCarton,estado:'esperando',participantes:[],nombres:{},pozo:0,ncart:0,sorteadas:[],abandonaron:[],llenaEn:null,origen:null,ultimaBola:serverTimestamp(),ganQuintina:null,ganBingo:null,creada:serverTimestamp()});
+    if(a==='crear'){
+    // 1. Buscamos lo que el admin escribió en el cuadro de texto del título
+    const inputTitulo = document.getElementById('mtitulo');
+    const textoCustom = inputTitulo ? inputTitulo.value.trim() : '';
+    
+    // 2. Si escribió algo, el título principal será eso. Si lo dejó vacío, ponemos uno por defecto.
+    const tituloPrincipal = textoCustom || ('Bingo de ' + me.name);
+    
+    // 3. Generamos el subtítulo automático (ej: Mesa #576)
+    const subtituloMesa = 'Mesa #' + (100 + Math.floor(Math.random() * 900));
+
+    // 4. Guardamos todo en Firebase
+    await addDoc(collection(db,'mesas'),{
+      nombre: tituloPrincipal,
+      subtitulo: subtituloMesa,
+      anfitrion: u,
+      anfitrionName: me.name,
+      premios: pref.prem,
+      cupo: +pref.cupo,
+      precio: cfg.precioCarton,
+      estado: 'esperando',
+      participantes: [],
+      nombres: {},
+      pozo: 0,
+      ncart: 0,
+      sorteadas: [],
+      abandonaron: [],
+      llenaEn: null,
+      origen: null,
+      ultimaBola: serverTimestamp(),
+      ganQuintina: null,
+      ganBingo: null,
+      creada: serverTimestamp()
+    });
     tab='inicio';
   }
   if(a==='cancelar')await deleteDoc(doc(db,'mesas',b.dataset.id||act.id));
