@@ -401,7 +401,11 @@ function juegoView(m){
 }
 function mesasAbiertas(ocupado){
   const lista=abiertas.filter(m=>(m.participantes.length<m.cupo&&!m.llenaEn)||m.participantes.includes(U.uid));
-  return '<h2>Mesas disponibles</h2>'+(lista.length?lista.map(m=>`<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="chip">${m.participantes.length}/${m.cupo}</span></div>
+  return '<h2>Mesas disponibles</h2>'+(lista.length?lista.map(m=>`<div class="card"><div class="row"><div>
+  <h2 style="font-size: 20px; margin-bottom: 2px;">${esc(m.nombre)}</h2>
+  <span class="note" style="color: var(--gold); font-weight: 700;">${esc(m.subtitulo || ('Mesa #' + m.id.slice(0,4)))}</span>
+</div>
+<span class="chip">${m.participantes.length}/${m.cupo}</span></div>
     <p class="note">${pLabel(m)} · Cartón ${fmt(m.precio)} · Pozo ${fmt(pozoNeto(m))}</p>
     ${ocupado||(act&&act.estado!=='terminada')||m.participantes.includes(U.uid)?'<p class="note">Ya estás en una mesa.</p>':unirseCtl(m)}</div>`).join(''):'<div class="card"><p class="note">Por ahora no hay mesas disponibles. El administrador las va a abrir.</p></div>');
 }
