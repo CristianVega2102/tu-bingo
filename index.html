@@ -244,8 +244,17 @@ function hablar(n){
 }
 // Marcas efectivas del cartón i: las manuales, más las que salieron si está activo el Auto-Marcado
 function efect(m,i,c){
-  const man=marks(m.id,i).filter(v=>m.sorteadas.includes(v));if(!auto)return man;
-  const t=new Set(man);c.forEach(v=>{if(v&&m.sorteadas.includes(v))t.add(v)});return [...t].sort((a,b)=>a-b);
+  const man=marks(m.id,i).filter(v=>m.sorteadas.includes(v));
+  if(!auto)return man;
+  const t=new Set(man);
+  c.forEach(v=>{if(v&&m.sorteadas.includes(v))t.add(v)});
+  const res=[...t].sort((a,b)=>a-b);
+  if(MK[m.id]?.[i]?.length !== res.length){
+    if(!MK[m.id]) MK[m.id]={};
+    MK[m.id][i]=res;
+    lsSet(mkKey(m.id),JSON.stringify(MK[m.id]));
+  }
+  return res;
 }
 function analiza(m,i,c){
   const mk=efect(m,i,c),nums=c.filter(Boolean),marcados=nums.filter(v=>mk.includes(v)).length;
