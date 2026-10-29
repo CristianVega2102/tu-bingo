@@ -225,24 +225,21 @@ const premios=m=>{
   const k=m.pozo*(100-(cfg.comision||0)),pb=m.premios==='ambos'?cfg.pctBingo:cfg.pctQuintina+cfg.pctBingo;
   return{q:Math.floor(k*cfg.pctQuintina/10000),b:Math.floor(k*pb/10000)};
 };
-const U30=['cero','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve'];
+const U30=['cero','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiuno','veintidós','veintitrés','veintiatro','veinticinco','veintisiete','veintiocho','veintinueve'];
 const DEC=['','','','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
 const enLetras=n=>n<30?U30[n]:DEC[(n/10)|0]+(n%10?' y '+U30[n%10]:'');
 const cap=t=>t.charAt(0).toUpperCase()+t.slice(1),pad=n=>String(n).padStart(2,'0');
-// Nombres de la cábala. Los que no figuran se muestran solo con el número.
 const NOMBRES={1:'El agua',2:'El niño',3:'San Cono',4:'La cama',5:'El gato',6:'El perro',7:'El revólver',8:'El incendio',9:'El arroyo',10:'La leche',11:'El minero',12:'El soldado',13:'La yeta',14:'El borracho',15:'La niña bonita',16:'El anillo',17:'La desgracia',18:'La sangre',19:'El pescado',20:'La fiesta',21:'La mujer',22:'El loco',23:'El cocinero',24:'El caballo',25:'La gallina',26:'La misa',27:'El peine',28:'Los cerros',29:'San Pedro',30:'Santa Rosa',31:'La luz',32:'El dinero',33:'Cristo',34:'La cabeza',35:'El pajarito',36:'La manteca',37:'El dentista',38:'Piedras',39:'Lluvia',40:'El cura',41:'El cuchillo',42:'Zapatillas',43:'Balcón',44:'La cárcel',45:'El vino',46:'Tomates',47:'El muerto',48:'El muerto que habla',49:'La carne',50:'El pan',51:'El serrucho',52:'Madre e hijo',53:'El barco',54:'La vaca',55:'La música',56:'La caída',57:'El jorobado',58:'Ahogado',59:'Las plantas',60:'La virgen',61:'La escopeta',62:'Inundación',63:'Casamiento',64:'Llanto',65:'El cazador',66:'Lombriz',67:'Mordida',68:'Sobrinos',69:'Vicios',70:'Muerto sueño',71:'Excremento',72:'Sorpresa',73:'Hospital',74:'Gente negra',75:'Los besos',76:'Las llamas',77:'Pierna mujer',78:'Ramera',79:'Ladrón',80:'La bocha',81:'Las Flores',82:'La Pelea',83:'Mal tiempo',84:'La Iglesia',85:'Linterna',86:'El humo',87:'Los piojos',88:'El papa',89:'La rata',90:'El miedo'};
 function hablarTexto(t){
   if(!voz||!('speechSynthesis' in window))return;
   try{const u=new SpeechSynthesisUtterance(t);u.lang='es-AR';u.rate=.95;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}
 }
 const NUM5=['','uno','dos','tres','cuatro','cinco'];
-// Texto que se dice en la cuenta regresiva: "El bingo está por comenzar en cinco... cuatro... tres..."
 const decirCuenta=r=>r===5?'El bingo está por comenzar en cinco':(r>=1&&r<=4?NUM5[r]:'');
 function hablar(n){
   if(!voz||!n||!('speechSynthesis' in window))return;
   try{const u=new SpeechSynthesisUtterance(enLetras(n)+(NOMBRES[n]?'. '+NOMBRES[n]:''));u.lang='es-AR';u.rate=.95;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}
 }
-// Marcas efectivas del cartón i: las manuales, más las que salieron si está activo el Auto-Marcado
 function efect(m,i,c){
   const man=marks(m.id,i).filter(v=>m.sorteadas.includes(v));
   if(!auto)return man;
@@ -323,7 +320,7 @@ function finPanel(m){
   const fila=(t,g)=>g?`<div class="wn"><span>${t}</span><b>${esc(g.nombre)}${g.uid===yo?' (vos)':''}${g.abandono?'<br><span class="note">por abandono</span>':''}</b><b class="gold">${fmt(g.premio)}</b></div>`:`<div class="wn"><span>${t}</span><b class="note">No se otorgó</b><span></span></div>`;
   const mios=pend().filter(x=>x.m.id===m.id);
   return `<div class="ovl" role="dialog" aria-modal="true" aria-label="Partida finalizada"><div class="pnl">
-    <h2>🏁 Partida finalizada</h2><p class="note">${esc(m.nombre)} · ${pLabel(m)}</p>
+    <h2>🏁 Partida finalizada</h2><p class="note">${esc(m.nombre)} ${m.subtitulo ? '('+esc(m.subtitulo)+')' : ''} · ${pLabel(m)}</p>
     ${gane?'<div class="msg ok">¡Felicitaciones, ganaste!</div>':(part?'<p class="note">Esta vez no ganaste. ¡Suerte en la próxima!</p>':'')}
     ${m.premios==='ambos'?fila('QUINTINA',gq):''}${fila('BINGO',gb)}
     <div class="det"><span>Pozo</span><b>${fmt(pozoNeto(m))}</b><span>Jugadores</span><b>${m.participantes.length}</b><span>Cartones</span><b>${m.ncart||0}</b><span>Bolillas sorteadas</span><b>${s.length}/90</b><span>Última bolilla</span><b>${s.length?s[s.length-1]:'—'}</b></div>
@@ -341,11 +338,7 @@ function unirseCtl(m){
 function esperaView(m){
   const soy=m.participantes.includes(U.uid),host=m.anfitrion===U.uid,n=m.participantes.length;
   const txt=encodeURIComponent(`Te espero en ${m.nombre} de TU BINGO. Cartón: ${fmt(m.precio)}. ${location.href}`);
-  return `<div class="card"><div class="row"><div>
-  <h2 style="font-size: 20px; margin-bottom: 2px;">${esc(m.nombre)}</h2>
-  <span class="note" style="color: var(--gold); font-weight: 700;">${esc(m.subtitulo || ('Mesa #' + m.id.slice(0,4)))}</span>
-</div>
-<span class="chip">${n}/${m.cupo}</span></div>
+  return `<div class="card"><div class="row"><div><h2 style="font-size:20px;margin-bottom:2px">${esc(m.nombre)}</h2><span class="note" style="color:var(--gold);font-weight:700">${esc(m.subtitulo || ('Mesa #' + m.id.slice(0,4)))}</span></div><span class="chip">${n}/${m.cupo}</span></div>
     <p class="note">Premios: ${pLabel(m)} · Cartón ${fmt(m.precio)} · Organiza: ${esc(m.anfitrionNombre||'')}</p>
     <div class="row"><span>Pozo acumulado</span><b class="mono gold" style="font-size:24px">${fmt(pozoNeto(m))}</b></div></div>
   <div class="card"><h2>Jugadores sentados</h2>${n?`<ul>${m.participantes.map(u=>`<li>${esc((m.nombres||{})[u]||'Jugador')}${u===m.anfitrion?' (anfitrión)':''}</li>`).join('')}</ul>`:'<p class="note">Todavía no se sentó nadie.</p>'}
@@ -401,18 +394,14 @@ function juegoView(m){
 }
 function mesasAbiertas(ocupado){
   const lista=abiertas.filter(m=>(m.participantes.length<m.cupo&&!m.llenaEn)||m.participantes.includes(U.uid));
-  return '<h2>Mesas disponibles</h2>'+(lista.length?lista.map(m=>`<div class="card"><div class="row"><div>
-  <h2 style="font-size: 20px; margin-bottom: 2px;">${esc(m.nombre)}</h2>
-  <span class="note" style="color: var(--gold); font-weight: 700;">${esc(m.subtitulo || ('Mesa #' + m.id.slice(0,4)))}</span>
-</div>
-<span class="chip">${m.participantes.length}/${m.cupo}</span></div>
+  return '<h2>Mesas disponibles</h2>'+(lista.length?lista.map(m=>`<div class="card"><div class="row"><div><h2 style="font-size:20px;margin-bottom:2px">${esc(m.nombre)}</h2><span class="note" style="color:var(--gold);font-weight:700">${esc(m.subtitulo || ('Mesa #' + m.id.slice(0,4)))}</span></div><span class="chip">${m.participantes.length}/${m.cupo}</span></div>
     <p class="note">${pLabel(m)} · Cartón ${fmt(m.precio)} · Pozo ${fmt(pozoNeto(m))}</p>
     ${ocupado||(act&&act.estado!=='terminada')||m.participantes.includes(U.uid)?'<p class="note">Ya estás en una mesa.</p>':unirseCtl(m)}</div>`).join(''):'<div class="card"><p class="note">Por ahora no hay mesas disponibles. El administrador las va a abrir.</p></div>');
 }
 function jugarView(){
   const ocupado=act&&act.estado!=='terminada';
   let h=ocupado?`<div class="card"><b>Ya estás en la mesa ${esc(act.nombre)}.</b><button class="b3" data-a="tab" data-v="inicio">Ir a mi mesa</button></div>`:'';
-    if(me.admin){
+  if(me.admin){
     const mias=hosted.filter(m=>m.estado!=='terminada'&&!oculta(m.id));
     h+=`<div class="card"><h2>Armar mesa (administrador)</h2>
       <label class="note">Título de la mesa<input id="mtitulo" type="text" placeholder="Ej. Bingo Familiar, Sorteo Nocturno..." maxlength="30" autocomplete="off"></label>
@@ -420,11 +409,7 @@ function jugarView(){
       <label class="note">Cantidad máxima de jugadores<select data-pref="cupo">${Array.from({length:49},(_,i)=>i+2).map(n=>`<option value="${n}" ${pref.cupo==n?'selected':''}>${n} jugadores</option>`).join('')}</select></label>
       <p class="note">Cartón: ${fmt(cfg.precioCarton)}. La partida empieza sola cuando se completa el cupo, con una cuenta regresiva. Una vez iniciada, nadie más puede sumarse.</p>
       <button class="b1" data-a="crear" ${busy?'disabled':''}>Crear mesa</button></div>`;
- if(mias.length)h+='<h2>Mis mesas</h2>'+mias.map(m=>`<div class="card"><div class="row"><div>
-  <h2 style="font-size: 20px; margin-bottom: 2px;">${esc(m.nombre)}</h2>
-  <span class="note" style="color: var(--gold); font-weight: 700;">${esc(m.subtitulo || ('Mesa #' + m.id.slice(0,4)))}</span>
-</div>
-<span class="chip">${m.participantes.length}/${m.cupo}</span></div>
+    if(mias.length)h+='<h2>Mis mesas</h2>'+mias.map(m=>`<div class="card"><div class="row"><div><h2 style="font-size:20px;margin-bottom:2px">${esc(m.nombre)}</h2><span class="note" style="color:var(--gold);font-weight:700">${esc(m.subtitulo || ('Mesa #' + m.id.slice(0,4)))}</span></div><span class="chip">${m.participantes.length}/${m.cupo}</span></div>
       <p class="note">${m.estado==='esperando'?'Esperando jugadores':'En juego · '+m.sorteadas.length+' bolillas'} · ${pLabel(m)} · Pozo ${fmt(pozoNeto(m))}</p>
       <div class="acts"><button class="b3" data-a="ver" data-id="${m.id}">Abrir</button>${m.estado==='esperando'&&m.participantes.length>=1&&!m.llenaEn?`<button class="b3" data-a="iniciar" data-id="${m.id}" ${busy?'disabled':''}>⚠️ Iniciar (emergencia)</button>`:''}${m.estado==='esperando'&&m.forzada&&m.llenaEn?`<button class="b3" data-a="cancelarInicio" data-id="${m.id}" ${busy?'disabled':''}>Cancelar inicio</button>`:''}${m.estado==='esperando'&&m.participantes.length===0?`<button class="b4" data-a="cancelar" data-id="${m.id}" ${busy?'disabled':''}>Cancelar</button>`:''}</div></div>`).join('');
   }
@@ -490,23 +475,17 @@ document.addEventListener('click',async e=>{
 
 async function accion(a,b){
   const u=U.uid,uref=doc(db,'users',u);
-    if(a==='crear'){
-    // 1. Buscamos lo que el admin escribió en el cuadro de texto del título
+  if(a==='crear'){
     const inputTitulo = document.getElementById('mtitulo');
     const textoCustom = inputTitulo ? inputTitulo.value.trim() : '';
-    
-    // 2. Si escribió algo, el título principal será eso. Si lo dejó vacío, ponemos uno por defecto.
     const tituloPrincipal = textoCustom || ('Bingo de ' + me.name);
-    
-    // 3. Generamos el subtítulo automático (ej: Mesa #576)
     const subtituloMesa = 'Mesa #' + (100 + Math.floor(Math.random() * 900));
 
-    // 4. Guardamos todo en Firebase
     await addDoc(collection(db,'mesas'),{
       nombre: tituloPrincipal,
       subtitulo: subtituloMesa,
       anfitrion: u,
-      anfitrionName: me.name,
+      anfitrionNombre: me.name,
       premios: pref.prem,
       cupo: +pref.cupo,
       precio: cfg.precioCarton,
@@ -559,7 +538,7 @@ async function accion(a,b){
       const nref=doc(collection(db,'mesas'));
       try{
         const w=writeBatch(db);
-        w.set(nref,{nombre:f.nombre,anfitrion:f.anfitrion,anfitrionNombre:f.anfitrionNombre,premios:f.premios,cupo:f.cupo,precio:cfg.precioCarton,estado:'esperando',participantes:[],nombres:{},pozo:0,ncart:0,sorteadas:[],abandonaron:[],llenaEn:null,origen:id0,ultimaBola:serverTimestamp(),ganQuintina:null,ganBingo:null,creada:serverTimestamp()});
+        w.set(nref,{nombre:f.nombre,subtitulo:f.subtitulo||'Mesa #'+(100+Math.floor(Math.random()*900)),anfitrion:f.anfitrion,anfitrionNombre:f.anfitrionNombre,premios:f.premios,cupo:f.cupo,precio:cfg.precioCarton,estado:'esperando',participantes:[],nombres:{},pozo:0,ncart:0,sorteadas:[],abandonaron:[],llenaEn:null,origen:id0,ultimaBola:serverTimestamp(),ganQuintina:null,ganBingo:null,creada:serverTimestamp()});
         w.update(r0,{siguiente:nref.id});
         await w.commit();sig=nref.id;
       }catch(e){const f2=(await getDoc(r0)).data();if(f2.siguiente)sig=f2.siguiente;else throw e}
@@ -613,8 +592,7 @@ async function reclamar(t){
     try{await addDoc(collection(db,'rechazos'),{uid:U.uid,nombre:me.name,mesa:m.id,mesaNombre:m.nombre,premio:t==='q'?'quintina':'bingo',carton:i+1,motivo,marcas:mk,diag:JSON.stringify(rz.diag),version:VERSION,creado:serverTimestamp()})}catch(e){}
   }
 }
-// Cuando el servidor rechaza, se comparan uno por uno los datos reales (mesa, cartón, configuración)
-// con lo que exigen las reglas, para decir exactamente qué falló.
+
 async function diagnostico(t,m,i,mk){
   const D={version:VERSION};let motivo=null;
   try{
@@ -639,7 +617,7 @@ async function diagnostico(t,m,i,mk){
         const com=cf.comision||0,pq=cf.pctQuintina===undefined?30:cf.pctQuintina,pbv=cf.pctBingo===undefined?70:cf.pctBingo;
         const pct=t==='q'?pq:(f.premios==='ambos'?pbv:pq+pbv),esperado=Math.floor(f.pozo*(100-com)*pct/10000);
         D.premioEnviado=premios(m)[t];D.premioServidor=esperado;D.pozo=f.pozo;D.config=cf;
-        if(D.premioEnviado!==esperado)motivo='El premio calculado no coincide con la configuración actual. Probá de nuevo.';
+        if(D.premioEnviado!==esperado)motivo='El premio calculated no coincide con la configuración actual. Probá de nuevo.';
       }
     }
   }catch(e){D.error=e.code||e.message}
@@ -660,9 +638,6 @@ function motivoRechazo(t,m,c,mk){
 }
 
 /* ---------- Bolillero automático ---------- */
-// Al iniciar la partida, las bolillas salen solas con el ritmo que fija el administrador.
-// Las dispara cualquier pantalla conectada de la mesa; las reglas de Firebase impiden adelantarse.
-// El tiempo se mide desde que esta pantalla VIO la última bolilla (no depende del reloj del teléfono).
 const sorteando={},jit={},visto={};
 let sorteoErr=null,fallos=0;
 const segMs=()=>Math.max(3,+cfg.segBola||6)*1000;
@@ -698,7 +673,7 @@ setInterval(()=>{
     if(toca(m,Date.now()))sortear(m);
   });
 },500);
-// Cuenta regresiva del bolillero ("Siguiente")
+
 setInterval(()=>{
   const m=act;if(!m||m.estado!=='jugando')return;
   const v=visto[m.id];if(!v)return;
@@ -708,8 +683,6 @@ setInterval(()=>{
 },200);
 
 /* ---------- Inicio automático (mesa completa o inicio de emergencia) ---------- */
-// Cuando se llena el cupo, o el administrador fuerza el inicio, empieza una cuenta regresiva.
-// Al terminar, cualquier jugador conectado de la mesa inicia la partida.
 const vistoLleno={},iniciando={},jit2={},anunciado={};
 const segInicioMs=()=>Math.max(5,+cfg.segInicio||15)*1000;
 const restaInicio=m=>{const v=vistoLleno[m.id]||Date.now();return Math.max(0,Math.ceil((segInicioMs()-(Date.now()-v))/1000))};
