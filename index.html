@@ -317,7 +317,7 @@ function finPanel(m){
     <h2>🏁 Partida finalizada</h2><p class="note">${esc(m.nombre)} · ${pLabel(m)}</p>
     ${gane?'<div class="msg ok">¡Felicitaciones, ganaste!</div>':(part?'<p class="note">Esta vez no ganaste. ¡Suerte en la próxima!</p>':'')}
     ${m.premios==='ambos'?fila('QUINTINA',gq):''}${fila('BINGO',gb)}
-    <div class="det"><span>Pozo (comisión descontada)</span><b>${fmt(pozoNeto(m))}</b><span>Jugadores</span><b>${m.participantes.length}</b><span>Cartones</span><b>${m.ncart||0}</b><span>Bolillas sorteadas</span><b>${s.length}/90</b><span>Última bolilla</span><b>${s.length?s[s.length-1]:'—'}</b></div>
+    <div class="det"><span>Pozo</span><b>${fmt(pozoNeto(m))}</b><span>Jugadores</span><b>${m.participantes.length}</b><span>Cartones</span><b>${m.ncart||0}</b><span>Bolillas sorteadas</span><b>${s.length}/90</b><span>Última bolilla</span><b>${s.length?s[s.length-1]:'—'}</b></div>
     ${mios.map(x=>`<button class="b1" data-a="cobrar" data-t="${x.t}" data-id="${m.id}" ${busy?'disabled':''}>Cobrar ${x.t==='q'?'Quintina':'Bingo'} · ${fmt(x.g.premio)}</button>`).join('')}
     ${part?`<button class="b2" data-a="revancha" data-id="${m.id}" ${busy?'disabled':''}>🔁 Jugar de nuevo en esta mesa</button>`:''}
     <div class="acts"><button class="b3" data-a="cerrarPanel" data-id="${m.id}">Ver la mesa</button><button class="b3" data-a="ocultar" data-id="${m.id}">Salir</button></div>
