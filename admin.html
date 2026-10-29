@@ -88,7 +88,7 @@ function lista(){
 }
 function extras(){
   const m=document.getElementById('ms');
-  if(m)m.innerHTML=ms.length?ms.map(x=>`<div class="mv"><b>${esc(x.nombre)}${x.subtitulo ? ' <span class="note" style="color:var(--gold);font-weight:700">('+esc(x.subtitulo)+')</span>' : ''} · ${esc(x.estado)}</b><span>Pozo ${fmt(x.pozo*(100-(cfg.comision||0))/100)} · ${x.participantes?x.participantes.length:0} jugadores · ${x.premios==='ambos'?'Quintina y Bingo':'Solo Bingo'}</span>
+  if(m)m.innerHTML=ms.length?ms.map(x=>`<div class="mv"><b>${esc(x.nombre)} · ${esc(x.estado)}</b><span>Pozo ${fmt(x.pozo*(100-(cfg.comision||0))/100)} · ${x.participantes?x.participantes.length:0} jugadores · ${x.premios==='ambos'?'Quintina y Bingo':'Solo Bingo'}</span>
     ${x.ganQuintina?`<span>Quintina: ${esc(x.ganQuintina.nombre)} (${fmt(x.ganQuintina.premio)}${x.ganQuintina.pagado?', cobrado':', sin cobrar'})</span>`:''}
     ${x.ganBingo?`<span>Bingo: ${esc(x.ganBingo.nombre)} (${fmt(x.ganBingo.premio)}${x.ganBingo.pagado?', cobrado':', sin cobrar'})</span>`:''}
     <span class="note">${ts(x.creada)}</span></div>`).join(''):'<p class="note">Todavía no hay mesas.</p>';
