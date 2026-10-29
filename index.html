@@ -346,12 +346,17 @@ function esperaView(m){
 }
 const cid=(m,i)=>'#'+(m.nombre.replace(/\D/g,'')||'0')+'-'+String.fromCharCode(65+i);
 function cartonHTML(m,i,k,ult){
-  const c=k.c,a=analiza(m,i,c),n=jug.cartones.length,open=n===1||abiertos.has(i);
-  if(!open)return `<div class="cc cl2"><div class="nn">#${i+1}</div><div style="flex:1"><b>Cartón ${cid(m,i)}</b> <span class="tg">A ${a.falta} del Bingo</span><br><span class="nt">Marcados: ${a.marcados} / 15 números</span></div><button class="ver" data-a="abrir" data-i="${i}">Ver grilla</button></div>`;
-  return `<div class="cc"><div class="ch"><span class="cid">${cid(m,i)}</span>${a.filaLista>=0?`<span class="fl">✔ Fila ${a.filaLista+1} lista</span>`:''}<span class="ac">Aciertos: <b>${a.aciertos}</b>/15</span></div>
-  <div class="gr">${c.map(v=>v?`<button class="cl ${a.mk.includes(v)?'m':''} ${v===ult?'u':''} ${rojo.has(i+':'+v)?'x':''} ${a.miss===1&&v===a.missNum&&Math.floor(c.indexOf(v)/9)===a.bestRow?'p':''}" data-a="mk" data-i="${i}" data-n="${v}" aria-pressed="${a.mk.includes(v)}" aria-label="Número ${v}">${v}</button>`:'<span class="cl e"></span>').join('')}</div>
-  <div class="row nt"><span>Progreso del cartón</span><b class="gold">${Math.round(a.marcados/15*100)}%</b></div><div class="pg"><i style="width:${a.marcados/15*100}%"></i></div>
-  ${n>1?`<button class="ver" data-a="abrir" data-i="${i}">Ocultar grilla</button>`:''}</div>`;
+  const c=k.c,a=analiza(m,i,c),n=jug.cartones.length;
+  return `<div class="cc">
+    <div class="ch">
+      <span class="cid">${cid(m,i)}</span>
+      ${a.filaLista>=0?`<span class="fl">✔ Fila ${a.filaLista+1} lista</span>`:''}
+      <span class="ac">Aciertos: <b>${a.aciertos}</b>/15</span>
+    </div>
+    <div class="gr">${c.map(v=>v?`<button class="cl ${a.mk.includes(v)?'m':''} ${v===ult?'u':''} ${rojo.has(i+':'+v)?'x':''} ${a.miss===1&&v===a.missNum&&Math.floor(c.indexOf(v)/9)===a.bestRow?'p':''}" data-a="mk" data-i="${i}" data-n="${v}" aria-pressed="${a.mk.includes(v)}" aria-label="Número ${v}">${v}</button>`:'<span class="cl e"></span>').join('')}</div>
+    <div class="row nt"><span>Progreso del cartón</span><b class="gold">${Math.round(a.marcados/15*100)}%</b></div>
+    <div class="pg"><i style="width:${a.marcados/15*100}%"></i></div>
+  </div>`;
 }
 function juegoView(m){
   const s=m.sorteadas,ult=s[s.length-1],pr=premios(m),gq=m.ganQuintina,gb=m.ganBingo,yoAb=(m.abandonaron||[]).includes(U.uid),part=m.participantes.includes(U.uid)&&!yoAb,jugando=m.estado==='jugando';
