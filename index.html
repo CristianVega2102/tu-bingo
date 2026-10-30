@@ -110,7 +110,7 @@ import {getAuth,onAuthStateChanged,createUserWithEmailAndPassword,signInWithEmai
 import {getFirestore,doc,getDoc,setDoc,addDoc,updateDoc,deleteDoc,onSnapshot,collection,query,where,writeBatch,runTransaction,serverTimestamp,arrayUnion,arrayRemove,increment} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {firebaseConfig} from "./config.js";
 
-const VERSION='2026-10-27 · v10';
+const VERSION='2026-10-30 · v11';
 const A=document.getElementById('app'),NAV=document.getElementById('nav');
 const fmt=n=>'$'+Math.round(n||0).toLocaleString('es-AR');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -147,7 +147,7 @@ function sonar(n,extra=0){
 let elim=false,U=null,me=null,cfg={precioCarton:500,comision:0,pctQuintina:30,pctBingo:70,segBola:6,segInicio:15,whatsapp:''};
 let abiertas=[],mias=[],hosted=[],movs=[],act=null,jug=null,unsubs=[],unJug=null,unJugKey='';
 let pin=null,tab='inicio',modo='in',msg=null,busy=false,online=navigator.onLine,pS=null,MK={};
-const pref={prem:'ambos',cupo:'10',n:'1'};
+const pref={prem:'ambos',cupo:'10',n:'1',tipo:'real'};
 const MSG={'mesa-cerrada':'La mesa ya empezó o cambió.','mesa-llena':'La mesa se llenó.','sin-saldo':'Saldo insuficiente.','auth/email-already-in-use':'Ese correo ya tiene una cuenta. Probá entrar.','auth/invalid-credential':'Correo o contraseña incorrectos.','auth/weak-password':'La contraseña necesita al menos 6 caracteres.','auth/invalid-email':'Escribí un correo válido.','permission-denied':'El servidor no aceptó la operación. Revisá tu saldo y que la mesa siga abierta.'};
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}},lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const oculta=id=>lsGet('tb_x_'+id)==='1';
@@ -305,13 +305,13 @@ function authView(){
 function inicioView(){
   const m=act;
   if(!m)return `<div class="card"><h2>¡Hola, ${esc(me.name)}!</h2><p class="note">Elegí una mesa para sentarte. Las mesas las arma el administrador.</p></div>`+pendHTML()
-    +(me.saldo<cfg.precioCarton?`<div class="card"><b>Tu saldo es ${fmt(me.saldo)}</b><p class="note">Un cartón cuesta ${fmt(cfg.precioCarton)}. Cargá saldo para poder jugar.</p><button class="b3" data-a="tab" data-v="saldo">Ir a Mi saldo</button></div>`:'')
+    +(me.saldo<cfg.precioCarton?`<div class="card"><b>Tu saldo es ${fmt(me.saldo)}</b><p class="note">Un cartón cuesta ${fmt(cfg.precioCarton)}. Cargá saldo para poder jugar.</p>${abiertas.some(x=>x.prueba)?'<p class="note">Mientras tanto, podés practicar gratis en las mesas de práctica.</p>':''}<button class="b3" data-a="tab" data-v="saldo">Ir a Mi saldo</button></div>`:'')
     +mesasAbiertas(false);
   return m.estado==='esperando'?esperaView(m):juegoView(m);
 }
 function pend(){
   const seen=new Set(),r=[];
-  [...mias,...hosted].forEach(m=>{if(seen.has(m.id))return;seen.add(m.id);
+  [...mias,...hosted].forEach(m=>{if(seen.has(m.id)||m.prueba)return;seen.add(m.id);
     [['q',m.ganQuintina],['b',m.ganBingo]].forEach(([t,g])=>{if(g&&g.uid===U.uid&&!g.pagado)r.push({m,t,g})})});
   return r;
 }
@@ -320,37 +320,37 @@ function finPanel(m){
   if(m.estado!=='terminada'||panelCerrado.has(m.id))return '';
   const gq=m.ganQuintina,gb=m.ganBingo,s=m.sorteadas,yo=U.uid,part=m.participantes.includes(yo);
   const gane=(gq&&gq.uid===yo)||(gb&&gb.uid===yo);
-  const fila=(t,g)=>g?`<div class="wn"><span>${t}</span><b>${esc(g.nombre)}${g.uid===yo?' (vos)':''}${g.abandono?'<br><span class="note">por abandono</span>':''}</b><b class="gold">${fmt(g.premio)}</b></div>`:`<div class="wn"><span>${t}</span><b class="note">No se otorgó</b><span></span></div>`;
+  const fila=(t,g)=>g?`<div class="wn"><span>${t}</span><b>${esc(g.nombre)}${g.uid===yo?' (vos)':''}${g.abandono?'<br><span class="note">por abandono</span>':''}</b><b class="gold">${m.prueba?'🎓':fmt(g.premio)}</b></div>`:`<div class="wn"><span>${t}</span><b class="note">No se otorgó</b><span></span></div>`;
   const mios=pend().filter(x=>x.m.id===m.id);
   return `<div class="ovl" role="dialog" aria-modal="true" aria-label="Partida finalizada"><div class="pnl">
     <h2>🏁 Partida finalizada</h2><p class="note">${esc(m.nombre)} · ${pLabel(m)}</p>
     ${gane?'<div class="msg ok">¡Felicitaciones, ganaste!</div>':(part?'<p class="note">Esta vez no ganaste. ¡Suerte en la próxima!</p>':'')}
     ${m.premios==='ambos'?fila('QUINTINA',gq):''}${fila('BINGO',gb)}
-    <div class="det"><span>Pozo</span><b>${fmt(pozoNeto(m))}</b><span>Jugadores</span><b>${m.participantes.length}</b><span>Cartones</span><b>${m.ncart||0}</b><span>Bolillas sorteadas</span><b>${s.length}/90</b><span>Última bolilla</span><b>${s.length?s[s.length-1]:'—'}</b></div>
+    <div class="det"><span>Pozo</span><b>${m.prueba?'Práctica':fmt(pozoNeto(m))}</b><span>Jugadores</span><b>${m.participantes.length}</b><span>Cartones</span><b>${m.ncart||0}</b><span>Bolillas sorteadas</span><b>${s.length}/90</b><span>Última bolilla</span><b>${s.length?s[s.length-1]:'—'}</b></div>
     ${mios.map(x=>`<button class="b1" data-a="cobrar" data-t="${x.t}" data-id="${m.id}" ${busy?'disabled':''}>Cobrar ${x.t==='q'?'Quintina':'Bingo'} · ${fmt(x.g.premio)}</button>`).join('')}
     ${part?`<button class="b2" data-a="revancha" data-id="${m.id}" ${busy?'disabled':''}>🔁 Jugar de nuevo en esta mesa</button>`:''}
     <div class="acts"><button class="b3" data-a="cerrarPanel" data-id="${m.id}">Ver la mesa</button><button class="b3" data-a="ocultar" data-id="${m.id}">Salir</button></div>
   </div></div>`;
 }
-const pLabel=m=>m.premios==='ambos'?'Quintina y Bingo':'Solo Bingo';
+const pLabel=m=>(m.prueba?'🎓 Práctica · ':'')+(m.premios==='ambos'?'Quintina y Bingo':'Solo Bingo');
 function unirseCtl(m){
-  const pr=m.precio;
-  return `<select data-pref="n" aria-label="Cantidad de cartones">${[1,2,3,4,5,6].map(i=>`<option value="${i}" ${pref.n==i?'selected':''}>${i} ${i===1?'cartón':'cartones'} · ${fmt(i*pr)}</option>`).join('')}</select>
+  const pr=m.prueba?0:m.precio;
+  return `<select data-pref="n" aria-label="Cantidad de cartones">${[1,2,3,4,5,6].map(i=>`<option value="${i}" ${pref.n==i?'selected':''}>${i} ${i===1?'cartón':'cartones'} · ${m.prueba?'gratis':fmt(i*pr)}</option>`).join('')}</select>
   <button class="b1" data-a="unirse" data-id="${m.id}" ${busy||m.participantes.length>=m.cupo||me.saldo<(+pref.n)*pr?'disabled':''}>${me.saldo<(+pref.n)*pr?'Saldo insuficiente':m.participantes.length>=m.cupo?'Mesa llena':'Sentarme'}</button>`;
 }
 function esperaView(m){
   const soy=m.participantes.includes(U.uid),host=m.anfitrion===U.uid,n=m.participantes.length;
-  const txt=encodeURIComponent(`Te espero en ${m.nombre} de TU BINGO. Cartón: ${fmt(m.precio)}. ${location.href}`);
+  const txt=encodeURIComponent(`Te espero en ${m.nombre} de TU BINGO. ${m.prueba?'Mesa de práctica gratis.':'Cartón: '+fmt(m.precio)+'.'} ${location.href}`);
   return `<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="chip">${n}/${m.cupo}</span></div>
-    <p class="note">Premios: ${pLabel(m)} · Cartón ${fmt(m.precio)} · Organiza: ${esc(m.anfitrionNombre||'')}</p>
-    <div class="row"><span>Pozo acumulado</span><b class="mono gold" style="font-size:24px">${fmt(pozoNeto(m))}</b></div></div>
+    <p class="note">${m.prueba?pLabel(m)+' · Sin dinero: no usa tu saldo':'Premios: '+pLabel(m)+' · Cartón '+fmt(m.precio)} · Organiza: ${esc(m.anfitrionNombre||'')}</p>
+    ${m.prueba?'':`<div class="row"><span>Pozo acumulado</span><b class="mono gold" style="font-size:24px">${fmt(pozoNeto(m))}</b></div>`}</div>
   <div class="card"><h2>Jugadores sentados</h2>${n?`<ul>${m.participantes.map(u=>`<li>${esc((m.nombres||{})[u]||'Jugador')}${u===m.anfitrion?' (anfitrión)':''}</li>`).join('')}</ul>`:'<p class="note">Todavía no se sentó nadie.</p>'}
     ${soy&&jug?`<p class="note">Tus cartones: ${jug.cartones.length}</p>`:''}</div>
   ${!soy&&!m.llenaEn?`<div class="card"><h2>Sentate en la mesa</h2>${unirseCtl(m)}</div>`:''}
   ${m.llenaEn&&(n>=m.cupo||m.forzada)?`<div class="card" style="text-align:center"><h2>${n>=m.cupo?'¡Mesa completa!':'¡Inicio de emergencia!'}</h2><p>La partida empieza en <b id="cdi" class="mono gold" style="font-size:30px">${restaInicio(m)}</b> segundos</p></div>`:`<div class="card"><b>Faltan ${Math.max(0,m.cupo-n)} jugador${m.cupo-n===1?'':'es'} para completar la mesa.</b><p class="note">La partida empieza sola cuando se completen los ${m.cupo} jugadores, con una cuenta regresiva de ${cfg.segInicio||15} segundos. Una vez iniciada, no se pueden sumar más jugadores.</p></div>`}
   ${host?(m.llenaEn&&m.forzada?`<button class="b3" data-a="cancelarInicio" data-id="${m.id}" ${busy?'disabled':''}>Cancelar el inicio de emergencia</button>`:(m.llenaEn?'':`<button class="b3" data-a="iniciar" data-id="${m.id}" ${busy||n<1?'disabled':''}>⚠️ Iniciar partida (emergencia)</button>`)):''}
   <a class="btn b3" target="_blank" rel="noopener" href="https://wa.me/?text=${txt}">Invitar por WhatsApp</a>
-  ${soy?`<button class="b4" data-a="salirMesa" ${busy||(host&&n>1)?'disabled':''}>Salir de la mesa (te devolvemos tu saldo)</button>`:''}
+  ${soy?`<button class="b4" data-a="salirMesa" ${busy||(host&&n>1)?'disabled':''}>Salir de la mesa${m.prueba?'':' (te devolvemos tu saldo)'}</button>`:''}
   ${host&&n===0?`<button class="b4" data-a="cancelar" data-id="${m.id}" ${busy?'disabled':''}>Cancelar mesa</button>`:''}`;
 }
 const cid=(m,i)=>'#'+(m.nombre.replace(/\D/g,'')||'0')+'-'+String.fromCharCode(65+i);
@@ -369,7 +369,7 @@ function cartonHTML(m,i,k,ult){
 }
 function juegoView(m){
   const s=m.sorteadas,ult=s[s.length-1],pr=premios(m),gq=m.ganQuintina,gb=m.ganBingo,yoAb=(m.abandonaron||[]).includes(U.uid),part=m.participantes.includes(U.uid)&&!yoAb,jugando=m.estado==='jugando';
-  const cobro=(g,t,n)=>g&&g.uid===U.uid&&!g.pagado?`<button class="b1" data-a="cobrar" data-t="${t}" data-id="${m.id}" ${busy?'disabled':''}>Cobrar ${n} · ${fmt(g.premio)}</button>`:'';
+  const cobro=(g,t,n)=>g&&!m.prueba&&g.uid===U.uid&&!g.pagado?`<button class="b1" data-a="cobrar" data-t="${t}" data-id="${m.id}" ${busy?'disabled':''}>Cobrar ${n} · ${fmt(g.premio)}</button>`:'';
   const nom=ult&&NOMBRES[ult];
   const prev=s.slice(-6,-1).reverse();
   const barra=`<div class="flot"><div class="fb" aria-live="polite" aria-label="${ult?'Última bolilla '+ult:'Sin bolillas todavía'}">${ult||'—'}</div>
@@ -377,7 +377,7 @@ function juegoView(m){
     ${jugando?`<div class="fr" title="Siguiente bolilla"><svg viewBox="0 0 64 64" aria-hidden="true"><circle class="rb" cx="32" cy="32" r="26"/><circle id="ring" class="rf" cx="32" cy="32" r="26" stroke-dasharray="163.4" stroke-dashoffset="163.4"/></svg><b id="sig">…</b></div>`:'<div class="fr fin" aria-hidden="true">🏁</div>'}</div>`;
   const ctl=`<div class="row" style="gap:8px;flex-wrap:wrap;justify-content:flex-start"><button class="voz ${voz?'on':''}" data-a="voz" aria-pressed="${voz}">🔊 ¡Voz Criolla!</button>${jugando&&m.participantes.includes(U.uid)&&!yoAb?'<button class="aband" data-a="aband">🚪 Salir / abandonar</button>':''}</div>
     ${jugando?`<p class="note">${sorteoErr?'<span style="color:#ff9fb0">Sorteo detenido ('+esc(sorteoErr)+'). </span><button class="ver" data-a="reintentar">Reintentar</button>':'Las bolillas salen solas cada '+(cfg.segBola||6)+' segundos.'}</p>`:''}${m.estado==='terminada'?`<p class="note">🏁 Sorteo finalizado${gb?': BINGO de '+esc(gb.nombre)+(gb.abandono?' (por abandono)':''):''}.</p>`:''}`;
-  const prem=`<div class="prem">${m.premios==='ambos'?`<div class="${gq?'g':''}">QUINTINA<b>${fmt(gq?gq.premio:pr.q)}</b><span class="note">${gq?'Ganó '+esc(gq.nombre):'Disponible'}</span></div>`:''}<div class="${gb?'g':''}" ${m.premios==='ambos'?'':'style="grid-column:1/-1"'}>BINGO<b>${fmt(gb?gb.premio:pr.b)}</b><span class="note">${gb?'Ganó '+esc(gb.nombre)+(gb.abandono?' por abandono':''):'Disponible'}</span></div></div>`;
+  const prem=`<div class="prem">${m.premios==='ambos'?`<div class="${gq?'g':''}">QUINTINA<b>${m.prueba?'🎓 Práctica':fmt(gq?gq.premio:pr.q)}</b><span class="note">${gq?'Ganó '+esc(gq.nombre):'Disponible'}</span></div>`:''}<div class="${gb?'g':''}" ${m.premios==='ambos'?'':'style="grid-column:1/-1"'}>BINGO<b>${m.prueba?'🎓 Práctica':fmt(gb?gb.premio:pr.b)}</b><span class="note">${gb?'Ganó '+esc(gb.nombre)+(gb.abandono?' por abandono':''):'Disponible'}</span></div></div>`;
   let hint='';
   if(part&&jug&&jugando){
     const an=jug.cartones.map((k,i)=>({i,a:analiza(m,i,k.c)}));
@@ -391,14 +391,14 @@ function juegoView(m){
   }
   const cant=part&&jug&&jugando?`<div class="cant">${m.premios==='ambos'&&!gq?`<button class="cq" data-a="recl" data-t="q" ${busy?'disabled':''}>¡Quintina!</button>`:''}${!gb?`<button class="cb" data-a="recl" data-t="b" ${busy?'disabled':''}>¡Bingo!</button>`:''}</div>`:'';
   const cards=yoAb&&jugando?`<div class="card"><b>Abandonaste esta mesa.</b><p class="note">Tus cartones ya no participan.</p><button class="b3" data-a="ocultar" data-id="${m.id}">Salir de la mesa</button></div>`:part?(jug?`<div class="row"><h2>Tus cartones (${jug.cartones.length})</h2><label class="sw">Auto-Marcado <button class="swb ${auto?'on':''}" data-a="auto" role="switch" aria-checked="${auto}" aria-label="Auto-marcado"><i></i></button></label></div>${hint}${cant}${jug.cartones.map((k,i)=>cartonHTML(m,i,k,ult)).join('')}`:'<div class="card"><p>Cargando tus cartones…</p></div>'):'';
-  const fin=m.estado==='terminada'?`<div class="card"><b>La partida terminó.</b><button class="b3" data-a="ocultar" data-id="${m.id}">Salir de la mesa</button><p class="note">Si ganaste y todavía no cobraste, tu premio queda en Inicio y en Mi saldo.</p></div>`:'';
+  const fin=m.estado==='terminada'?`<div class="card"><b>La partida terminó.</b><button class="b3" data-a="ocultar" data-id="${m.id}">Salir de la mesa</button>${m.prueba?'<p class="note">Era una mesa de práctica: no hay premios ni se movió tu saldo.</p>':'<p class="note">Si ganaste y todavía no cobraste, tu premio queda en Inicio y en Mi saldo.</p>'}</div>`:'';
   return `${barra}${ctl}${prem}${fin}${cobro(gq,'q','Quintina')}${cobro(gb,'b','Bingo')}${cards}
   <div class="card"><h2>Tablero de 90 números</h2><div class="t90">${Array.from({length:90},(_,i)=>i+1).map(n=>s.includes(n)?`<span class="t s" style="background:${col(n)}">${n}</span>`:`<span class="t">${n}</span>`).join('')}</div></div>${finPanel(m)}`;
 }
 function mesasAbiertas(ocupado){
   const lista=abiertas.filter(m=>(m.participantes.length<m.cupo&&!m.llenaEn)||m.participantes.includes(U.uid));
   return '<h2>Mesas disponibles</h2>'+(lista.length?lista.map(m=>`<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="chip">${m.participantes.length}/${m.cupo}</span></div>
-    <p class="note">${pLabel(m)} · Cartón ${fmt(m.precio)} · Pozo ${fmt(pozoNeto(m))}</p>
+    <p class="note">${m.prueba?pLabel(m)+' · Gratis, sin usar saldo':pLabel(m)+' · Cartón '+fmt(m.precio)+' · Pozo '+fmt(pozoNeto(m))}</p>
     ${ocupado||(act&&act.estado!=='terminada')||m.participantes.includes(U.uid)?'<p class="note">Ya estás en una mesa.</p>':unirseCtl(m)}</div>`).join(''):'<div class="card"><p class="note">Por ahora no hay mesas disponibles. El administrador las va a abrir.</p></div>');
 }
 function jugarView(){
@@ -409,10 +409,11 @@ function jugarView(){
     h+=`<div class="card"><h2>Armar mesa (administrador)</h2>
       <label class="note">Premios<select data-pref="prem"><option value="ambos" ${pref.prem==='ambos'?'selected':''}>Quintina y Bingo</option><option value="bingo" ${pref.prem==='bingo'?'selected':''}>Solo Bingo</option></select></label>
       <label class="note">Cantidad máxima de jugadores<select data-pref="cupo">${Array.from({length:49},(_,i)=>i+2).map(n=>`<option value="${n}" ${pref.cupo==n?'selected':''}>${n} jugadores</option>`).join('')}</select></label>
-      <p class="note">Cartón: ${fmt(cfg.precioCarton)}. La partida empieza sola cuando se completa el cupo, con una cuenta regresiva. Una vez iniciada, nadie más puede sumarse.</p>
+      <label class="note">Tipo de mesa<select data-pref="tipo"><option value="real" ${pref.tipo==='real'?'selected':''}>Con dinero (usa saldo)</option><option value="prueba" ${pref.tipo==='prueba'?'selected':''}>Práctica (sin saldo, para aprender)</option></select></label>
+      <p class="note">${pref.tipo==='prueba'?'Mesa de práctica: gratis, no mueve saldo ni reparte premios.':'Cartón: '+fmt(cfg.precioCarton)+'.'} La partida empieza sola cuando se completa el cupo, con una cuenta regresiva. Una vez iniciada, nadie más puede sumarse.</p>
       <button class="b1" data-a="crear" ${busy?'disabled':''}>Crear mesa</button></div>`;
     if(mias.length)h+='<h2>Mis mesas</h2>'+mias.map(m=>`<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="chip">${m.participantes.length}/${m.cupo}</span></div>
-      <p class="note">${m.estado==='esperando'?'Esperando jugadores':'En juego · '+m.sorteadas.length+' bolillas'} · ${pLabel(m)} · Pozo ${fmt(pozoNeto(m))}</p>
+      <p class="note">${m.estado==='esperando'?'Esperando jugadores':'En juego · '+m.sorteadas.length+' bolillas'} · ${pLabel(m)}${m.prueba?'':' · Pozo '+fmt(pozoNeto(m))}</p>
       <div class="acts"><button class="b3" data-a="ver" data-id="${m.id}">Abrir</button>${m.estado==='esperando'&&m.participantes.length>=1&&!m.llenaEn?`<button class="b3" data-a="iniciar" data-id="${m.id}" ${busy?'disabled':''}>⚠️ Iniciar (emergencia)</button>`:''}${m.estado==='esperando'&&m.forzada&&m.llenaEn?`<button class="b3" data-a="cancelarInicio" data-id="${m.id}" ${busy?'disabled':''}>Cancelar inicio</button>`:''}${m.estado==='esperando'&&m.participantes.length===0?`<button class="b4" data-a="cancelar" data-id="${m.id}" ${busy?'disabled':''}>Cancelar</button>`:''}</div></div>`).join('');
   }
   return h+mesasAbiertas(ocupado);
@@ -478,14 +479,14 @@ document.addEventListener('click',async e=>{
 async function accion(a,b){
   const u=U.uid,uref=doc(db,'users',u);
   if(a==='crear'){
-    await addDoc(collection(db,'mesas'),{nombre:'Mesa #'+(100+Math.floor(Math.random()*900)),anfitrion:u,anfitrionNombre:me.name,premios:pref.prem,cupo:+pref.cupo,precio:cfg.precioCarton,estado:'esperando',participantes:[],nombres:{},pozo:0,ncart:0,sorteadas:[],abandonaron:[],llenaEn:null,origen:null,ultimaBola:serverTimestamp(),ganQuintina:null,ganBingo:null,creada:serverTimestamp()});
+    await addDoc(collection(db,'mesas'),{nombre:(pref.tipo==='prueba'?'Práctica #':'Mesa #')+(100+Math.floor(Math.random()*900)),anfitrion:u,anfitrionNombre:me.name,premios:pref.prem,cupo:+pref.cupo,precio:pref.tipo==='prueba'?0:cfg.precioCarton,...(pref.tipo==='prueba'?{prueba:true}:{}),estado:'esperando',participantes:[],nombres:{},pozo:0,ncart:0,sorteadas:[],abandonaron:[],llenaEn:null,origen:null,ultimaBola:serverTimestamp(),ganQuintina:null,ganBingo:null,creada:serverTimestamp()});
     tab='inicio';
   }
   if(a==='cancelar')await deleteDoc(doc(db,'mesas',b.dataset.id||act.id));
   if(a==='unirse'){
     const mref=doc(db,'mesas',b.dataset.id),n=+pref.n;
     await runTransaction(db,async t=>{
-      const d=(await t.get(mref)).data(),costo=n*d.precio;
+      const d=(await t.get(mref)).data(),costo=d.prueba?0:n*d.precio;
       if(d.estado!=='esperando'||d.llenaEn||d.participantes.includes(u))throw{code:'mesa-cerrada'};
       if(d.participantes.length>=d.cupo)throw{code:'mesa-llena'};
       if(me.saldo<costo)throw{code:'sin-saldo'};
@@ -493,8 +494,8 @@ async function accion(a,b){
       if(lleno)datos.llenaEn=serverTimestamp();
       t.set(doc(db,'mesas',mref.id,'jugadores',u),{uid:u,name:me.name,cartones:Array.from({length:n},()=>cartonDoc())});
       t.update(mref,datos);
-      t.update(uref,{saldo:increment(-costo)});
-      t.set(doc(collection(db,'movimientos')),{uid:u,tipo:'compra',monto:-costo,detalle:d.nombre+' · '+n+(n===1?' cartón':' cartones'),creado:serverTimestamp()});
+      if(!d.prueba)t.update(uref,{saldo:increment(-costo)});
+      if(!d.prueba)t.set(doc(collection(db,'movimientos')),{uid:u,tipo:'compra',monto:-costo,detalle:d.nombre+' · '+n+(n===1?' cartón':' cartones'),creado:serverTimestamp()});
     });
     tab='inicio';
   }
@@ -503,8 +504,8 @@ async function accion(a,b){
     const w=writeBatch(db);
     w.delete(doc(db,'mesas',m.id,'jugadores',u));
     w.update(doc(db,'mesas',m.id),{participantes:arrayRemove(u),pozo:increment(-costo),ncart:increment(-n),llenaEn:null,forzada:false});
-    w.update(uref,{saldo:increment(costo),mesaSalida:m.id,tipoCobro:null});
-    w.set(doc(collection(db,'movimientos')),{uid:u,tipo:'devolucion',monto:costo,detalle:m.nombre,creado:serverTimestamp()});
+    if(!m.prueba)w.update(uref,{saldo:increment(costo),mesaSalida:m.id,tipoCobro:null});
+    if(!m.prueba)w.set(doc(collection(db,'movimientos')),{uid:u,tipo:'devolucion',monto:costo,detalle:m.nombre,creado:serverTimestamp()});
     await w.commit();
   }
   if(a==='revancha'){
@@ -514,7 +515,7 @@ async function accion(a,b){
       const nref=doc(collection(db,'mesas'));
       try{
         const w=writeBatch(db);
-        w.set(nref,{nombre:f.nombre,anfitrion:f.anfitrion,anfitrionNombre:f.anfitrionNombre,premios:f.premios,cupo:f.cupo,precio:cfg.precioCarton,estado:'esperando',participantes:[],nombres:{},pozo:0,ncart:0,sorteadas:[],abandonaron:[],llenaEn:null,origen:id0,ultimaBola:serverTimestamp(),ganQuintina:null,ganBingo:null,creada:serverTimestamp()});
+        w.set(nref,{nombre:f.nombre,anfitrion:f.anfitrion,anfitrionNombre:f.anfitrionNombre,premios:f.premios,cupo:f.cupo,precio:f.prueba?0:cfg.precioCarton,...(f.prueba?{prueba:true}:{}),estado:'esperando',participantes:[],nombres:{},pozo:0,ncart:0,sorteadas:[],abandonaron:[],llenaEn:null,origen:id0,ultimaBola:serverTimestamp(),ganQuintina:null,ganBingo:null,creada:serverTimestamp()});
         w.update(r0,{siguiente:nref.id});
         await w.commit();sig=nref.id;
       }catch(e){const f2=(await getDoc(r0)).data();if(f2.siguiente)sig=f2.siguiente;else throw e}
@@ -558,7 +559,7 @@ async function reclamar(t){
   const datos=t==='q'?{ganQuintina:{...base,fila:mejorFila(c,mk),premio:pr.q}}:{ganBingo:{...base,premio:pr.b},estado:'terminada'};
   try{
     await updateDoc(ref,datos);
-    msg={t:'ok',x:t==='q'?'¡QUINTINA aceptada! Ya podés cobrar tu premio en Inicio.':'¡BINGO aceptado! Ya podés cobrar tu premio en Inicio.'};
+    msg={t:'ok',x:t==='q'?'¡QUINTINA aceptada!'+(m.prueba?' Es una práctica: no hay premio.':' Ya podés cobrar tu premio en Inicio.'):'¡BINGO aceptado!'+(m.prueba?' Es una práctica: no hay premio.':' Ya podés cobrar tu premio en Inicio.')};
     tab='inicio';
   }catch(x){
     if(x.code!=='permission-denied')throw x;
