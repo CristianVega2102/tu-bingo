@@ -373,16 +373,16 @@ function esperaView(m){
   const txt=encodeURIComponent(`Te espero en ${m.nombre} de TU BINGO. ${m.prueba?'Mesa de práctica gratis.':'Cartón: '+fmt(m.precio)+'.'} ${location.href}`);
   let estado;
   if(cuentaActiva(m))estado=`<div class="card" style="text-align:center"><h2>¡La partida está por empezar!</h2><p>Empieza en <b id="cdi" class="mono gold" style="font-size:30px">${restaInicio(m)}</b> segundos</p>${sala==='principal'?'<p class="note">Si se suma otro jugador, la cuenta regresiva vuelve a empezar.</p>':''}</div>`;
-  else if(sala==='torneo')estado=`<div class="card" style="text-align:center"><h2>Torneo programado</h2>${T.fecha?`<p class="gold"><b>${esc(fechaTxt(T.fecha))}</b></p><p>Faltan <b id="cdt" class="mono gold">${cuentaTorneo()}</b></p>`:'<p class="note">El administrador todavía no fijó la fecha.</p>'}<p class="note">${n<2?'Hacen falta al menos 2 inscriptos para empezar.':'Empieza sola a la hora indicada.'} Podés salir y recuperar tu saldo hasta que empiece.</p></div>`;
+  else if(sala==='torneo')estado=`<div class="card" style="text-align:center"><h2>Torneo programado</h2>${T.fecha?`<p class="gold"><b>${esc(fechaTxt(T.fecha))}</b></p><p>Faltan <b id="cdt" class="mono gold">${cuentaTorneo()}</b></p>`:'<p class="note">El administrador todavía no fijó la fecha.</p>'}<p class="note">Ya estás inscripto. Una vez anotado no hay devolución. Podés salir de esta pantalla y jugar otras partidas tranquilamente; el torneo comenzará automáticamente a la hora programada.</p></div>`;
   else estado=`<div class="card"><b>Esperando jugadores</b><p class="note">Con 2 jugadores empieza una cuenta regresiva de ${cfg.segInicio||15} segundos. Una vez iniciada la partida, no se pueden sumar más jugadores.</p></div>`;
   return `<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="chip">${n}/${m.cupo}</span></div>
     <p class="note">${m.prueba?pLabel(m)+' · Sin dinero: no usa tu saldo':'Premios: '+pLabel(m)+' · Cartón '+fmt(m.precio)}</p>
     ${m.prueba?'':`<div class="row"><span>Pozo acumulado</span><b class="mono gold" style="font-size:24px">${fmt(pozoNeto(m))}</b></div>`}</div>
-  <div class="card"><h2>Jugadores sentados</h2>${n?`<ul>${m.participantes.map(u=>`<li>${esc((m.nombres||{})[u]||'Jugador')}</li>`).join('')}</ul>`:'<p class="note">Todavía no se sentó nadie.</p>'}
+  <div class="card"><h2>Jugadores inscriptos (${n})</h2>${n?`<ul>${m.participantes.map(u=>`<li>${esc((m.nombres||{})[u]||'Jugador')}</li>`).join('')}</ul>`:'<p class="note">Todavía no hay inscriptos.</p>'}
     ${jug?`<p class="note">Tus cartones: ${jug.cartones.length}</p>`:''}</div>
   ${estado}
   ${m.prueba?'':`<a class="btn b3" target="_blank" rel="noopener" href="https://wa.me/?text=${txt}">Invitar por WhatsApp</a>`}
-  <button class="b4" data-a="salirMesa" ${busy?'disabled':''}>Salir de la mesa${m.prueba?'':' (te devolvemos tu saldo)'}</button>`;
+  <button class="b4" data-a="salirMesa" ${busy?'disabled':''}>${sala==='torneo'?'Salir de esta pantalla (Quedás Inscripto)':'Salir de la mesa (te devolvemos tu saldo)'}</button>`;
 }
 const cid=(m,i)=>'#'+(m.sala==='torneo'?'T':m.sala==='prueba'?'X':'P')+'-'+String.fromCharCode(65+i);
 function cartonHTML(m,i,k,ult){
@@ -564,8 +564,17 @@ async function accion(a,b){
     }
     tab='inicio';
   }
-  if(a==='salirMesa'){
-    const m=act,n=jug?jug.cartones.length:0,costo=n*m.precio,quedan=m.participantes.length-1;
+    if(a==='salirMesa'){
+    const m=act, sala=m.sala||'principal';
+    if(sala==='torneo'){
+      // En el torneo solo sale de la vista actual, pero queda inscripto y no se borran sus datos ni se devuelve saldo
+      pin = null;
+      msg = {t:'ok', x:'Saliste de la vista del torneo, pero ya estás inscripto. Podés seguir jugando otras partidas.'};
+      return view();
+    }
+    
+    // Comportamiento normal para mesas principales / práctica
+    const n=jug?jug.cartones.length:0,costo=n*m.precio,quedan=m.participantes.length-1;
     const w=writeBatch(db);
     w.delete(doc(db,'mesas',m.id,'jugadores',u));
     w.update(doc(db,'mesas',m.id),{participantes:arrayRemove(u),pozo:increment(-costo),ncart:increment(-n),llenaEn:(m.sala==='principal'&&quedan>=2)?serverTimestamp():null});
