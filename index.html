@@ -155,6 +155,7 @@ const pref={prem:'ambos',cupo:'10',n:'1',tipo:'real'};
 const MSG={'mesa-cerrada':'La mesa ya empezó o cambió.','mesa-llena':'La mesa se llenó.','sin-saldo':'Saldo insuficiente.','auth/email-already-in-use':'Ese correo ya tiene una cuenta. Probá entrar.','auth/invalid-credential':'Correo o contraseña incorrectos.','auth/weak-password':'La contraseña necesita al menos 6 caracteres.','auth/invalid-email':'Escribí un correo válido.','sala-no-disponible':'La mesa no está disponible ahora. Probá de nuevo en unos segundos.','torneo-cerrado':'La inscripción al torneo está cerrada.','permission-denied':'El servidor no aceptó la operación. Revisá tu saldo y que la mesa siga abierta.'};
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}},lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const oculta=id=>lsGet('tb_x_'+id)==='1';
+const dejada=id=>lsGet('tb_w_'+id)==='1';
 const visible=x=>{const ab=(x.abandonaron||[]).includes(U.uid);if(!ab)return true;const g=x.ganBingo;return x.estado==='terminada'&&!!g&&g.uid===U.uid&&!g.pagado};
 let voz=lsGet('tb_voz')!=='0',auto=lsGet('tb_auto')==='1';const abiertos=new Set([0]),rojo=new Set(),panelCerrado=new Set();let pinA=null;
 
@@ -180,9 +181,10 @@ window.addEventListener('online',()=>{online=true;view()});window.addEventListen
 function refrescar(){
   const m=new Map();[...mias,...hosted].forEach(x=>m.set(x.id,x));
   const rank={jugando:0,esperando:1,terminada:2};
-  const lst=[...m.values()].filter(x=>!oculta(x.id)&&visible(x)).sort((a,b)=>rank[a.estado]-rank[b.estado]||((b.creada&&b.creada.toMillis?b.creada.toMillis():0)-(a.creada&&a.creada.toMillis?a.creada.toMillis():0)));
+  const lst=[...m.values()].filter(x=>!oculta(x.id)&&visible(x)&&!(x.estado==='esperando'&&dejada(x.id))).sort((a,b)=>rank[a.estado]-rank[b.estado]||((b.creada&&b.creada.toMillis?b.creada.toMillis():0)-(a.creada&&a.creada.toMillis?a.creada.toMillis():0)));
   const activa=lst.find(x=>x.estado!=='terminada'),cand=pinA&&abiertas.find(x=>x.id===pinA&&x.estado==='esperando');
-  act=(pin&&lst.find(x=>x.id===pin))||activa||cand||lst[0]||null;
+  const prev=act&&lst.find(x=>x.id===act.id&&x.estado!=='terminada');
+  act=(pin&&lst.find(x=>x.id===pin))||prev||activa||cand||lst[0]||null;
   const key=act&&act.participantes.includes(U.uid)?act.id:'';
   if(key!==unJugKey){
     if(unJug)unJug();unJug=null;jug=null;unJugKey=key;
@@ -310,10 +312,10 @@ function authView(){
 }
 function inicioView(){
   const m=act;
-  if(!m)return `<div class="card"><h2>¡Hola, ${esc(me.name)}!</h2><p class="note">Elegí una mesa para jugar.</p></div>`+pendHTML()
+  if(!m)return `<div class="card"><h2>¡Hola, ${esc(me.name)}!</h2><p class="note">Elegí una mesa para jugar.</p></div>`+otrasHTML()+pendHTML()
     +(me.saldo<cfg.precioCarton?`<div class="card"><b>Tu saldo es ${fmt(me.saldo)}</b><p class="note">Un cartón cuesta ${fmt(cfg.precioCarton)}. Cargá saldo para jugar en la mesa principal o en el torneo.${salaCfg('prueba').activa?' Mientras tanto, podés practicar gratis.':''}</p><button class="b3" data-a="tab" data-v="saldo">Ir a Mi saldo</button></div>`:'')
     +salasHTML();
-  return m.estado==='esperando'?esperaView(m):juegoView(m);
+  return otrasHTML()+(m.estado==='esperando'?esperaView(m):juegoView(m));
 }
 function pend(){
   const seen=new Set(),r=[];
@@ -339,6 +341,14 @@ function finPanel(m){
   </div></div>`;
 }
 const pLabel=m=>(m.prueba?'🎓 Práctica · ':'')+(m.premios==='ambos'?'Quintina y Bingo':'Solo Bingo');
+// Mesas donde estoy anotado y que no estoy viendo ahora (por ejemplo, el torneo mientras juego en la mesa principal)
+function otrasHTML(){
+  return mias.filter(x=>x.estado!=='terminada'&&!oculta(x.id)&&visible(x)&&!(act&&x.id===act.id)).map(x=>{
+    const t=x.estado==='jugando'?`¡${esc(x.nombre)} está en juego!`:`Estás inscripto en ${esc(x.nombre)}`;
+    const d=x.estado==='jugando'?'Tus cartones ya están jugando.':(x.sala==='torneo'&&salaCfg('torneo').fecha?esc(fechaTxt(salaCfg('torneo').fecha)):'Esperando que empiece.');
+    return `<div class="hint"><div><b>${t}</b><br><span class="nt">${d}</span></div><button class="b1" style="min-height:40px;padding:8px 12px;font-size:15px" data-a="ver" data-id="${x.id}">Ir</button></div>`;
+  }).join('');
+}
 const SALAS_NOM={principal:'Mesa principal',torneo:'Torneo',prueba:'Práctica'};
 // Datos de cada mesa fija (con los mismos valores por defecto que usan las reglas de Firebase)
 const salaCfg=s=>{const d=salas[s]||{};return{cupo:d.cupo||(s==='principal'?30:50),premios:d.premios||'ambos',precio:s==='torneo'?(d.precio||cfg.precioCarton):cfg.precioCarton,activa:d.activa===true,fecha:d.fecha&&d.fecha.toMillis?d.fecha.toMillis():0}};
@@ -365,7 +375,7 @@ function salasHTML(){
     ${unirseCtl('principal',mp)}</div>
   <div class="card"><div class="row"><h2>🏆 Torneo</h2><span class="chip">${nt}/${T.cupo}</span></div>
     <p class="note">${T.premios==='ambos'?'Quintina y Bingo':'Solo Bingo'} · Inscripción ${fmt(T.precio)} por cartón · Pozo ${fmt(mt?pozoNeto(mt):0)}</p>
-    ${abierto?`<p><b class="gold">${esc(fechaTxt(T.fecha))}</b></p><p class="note">Faltan <b id="cdt">${cuentaTorneo()}</b>. Empieza sola a esa hora si hay al menos 2 inscriptos.</p>${unirseCtl('torneo',mt)}`:'<p class="note">Todavía no hay fecha programada para el próximo torneo. El administrador la va a anunciar.</p>'}</div>
+    ${abierto?`<p><b class="gold">${esc(fechaTxt(T.fecha))}</b></p><p class="note">Faltan <b id="cdt">${cuentaTorneo()}</b>. Empieza sola a esa hora si hay al menos 2 inscriptos. La inscripción no se devuelve.</p>${mt&&mt.participantes.includes(U.uid)?`<div class="msg ok">✅ Ya estás inscripto en el torneo. Mientras tanto podés jugar otras mesas.</div><button class="b3" data-a="ver" data-id="${mt.id}">Ver mi mesa del torneo</button>`:unirseCtl('torneo',mt)}`:'<p class="note">Todavía no hay fecha programada para el próximo torneo. El administrador la va a anunciar.</p>'}</div>
   ${X.activa?`<div class="card"><h2>🎓 Mesa de práctica</h2><p class="note">Jugá gratis, solo y sin esperar rivales. No usa saldo ni reparte premios, ni cuenta para el ranking.</p>${unirseCtl('prueba',null)}</div>`:''}`;
 }
 function esperaView(m){
@@ -373,16 +383,16 @@ function esperaView(m){
   const txt=encodeURIComponent(`Te espero en ${m.nombre} de TU BINGO. ${m.prueba?'Mesa de práctica gratis.':'Cartón: '+fmt(m.precio)+'.'} ${location.href}`);
   let estado;
   if(cuentaActiva(m))estado=`<div class="card" style="text-align:center"><h2>¡La partida está por empezar!</h2><p>Empieza en <b id="cdi" class="mono gold" style="font-size:30px">${restaInicio(m)}</b> segundos</p>${sala==='principal'?'<p class="note">Si se suma otro jugador, la cuenta regresiva vuelve a empezar.</p>':''}</div>`;
-  else if(sala==='torneo')estado=`<div class="card" style="text-align:center"><h2>Torneo programado</h2>${T.fecha?`<p class="gold"><b>${esc(fechaTxt(T.fecha))}</b></p><p>Faltan <b id="cdt" class="mono gold">${cuentaTorneo()}</b></p>`:'<p class="note">El administrador todavía no fijó la fecha.</p>'}<p class="note">Ya estás inscripto. Una vez anotado no hay devolución. Podés salir de esta pantalla y jugar otras partidas tranquilamente; el torneo comenzará automáticamente a la hora programada.</p></div>`;
+  else if(sala==='torneo')estado=`<div class="card" style="text-align:center"><h2>Torneo programado</h2>${T.fecha?`<p class="gold"><b>${esc(fechaTxt(T.fecha))}</b></p><p>Faltan <b id="cdt" class="mono gold">${cuentaTorneo()}</b></p>`:'<p class="note">El administrador todavía no fijó la fecha.</p>'}<p class="note">${n<2?'Hacen falta al menos 2 inscriptos para empezar.':'Empieza sola a la hora indicada.'} La inscripción no se devuelve. Podés salir de esta pantalla y jugar otras mesas: seguís inscripto.</p></div>`;
   else estado=`<div class="card"><b>Esperando jugadores</b><p class="note">Con 2 jugadores empieza una cuenta regresiva de ${cfg.segInicio||15} segundos. Una vez iniciada la partida, no se pueden sumar más jugadores.</p></div>`;
   return `<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="chip">${n}/${m.cupo}</span></div>
     <p class="note">${m.prueba?pLabel(m)+' · Sin dinero: no usa tu saldo':'Premios: '+pLabel(m)+' · Cartón '+fmt(m.precio)}</p>
     ${m.prueba?'':`<div class="row"><span>Pozo acumulado</span><b class="mono gold" style="font-size:24px">${fmt(pozoNeto(m))}</b></div>`}</div>
-  <div class="card"><h2>Jugadores inscriptos (${n})</h2>${n?`<ul>${m.participantes.map(u=>`<li>${esc((m.nombres||{})[u]||'Jugador')}</li>`).join('')}</ul>`:'<p class="note">Todavía no hay inscriptos.</p>'}
+  <div class="card"><h2>Jugadores sentados</h2>${n?`<ul>${m.participantes.map(u=>`<li>${esc((m.nombres||{})[u]||'Jugador')}</li>`).join('')}</ul>`:'<p class="note">Todavía no se sentó nadie.</p>'}
     ${jug?`<p class="note">Tus cartones: ${jug.cartones.length}</p>`:''}</div>
   ${estado}
   ${m.prueba?'':`<a class="btn b3" target="_blank" rel="noopener" href="https://wa.me/?text=${txt}">Invitar por WhatsApp</a>`}
-  <button class="b4" data-a="salirMesa" ${busy?'disabled':''}>${sala==='torneo'?'Salir de esta pantalla (Quedás Inscripto)':'Salir de la mesa (te devolvemos tu saldo)'}</button>`;
+  ${sala==='torneo'?`<button class="b3" data-a="dejar" data-id="${m.id}">Salir de esta pantalla (seguís inscripto)</button>`:`<button class="b4" data-a="salirMesa" ${busy?'disabled':''}>Salir de la mesa${m.prueba?'':' (te devolvemos tu saldo)'}</button>`}`;
 }
 const cid=(m,i)=>'#'+(m.sala==='torneo'?'T':m.sala==='prueba'?'X':'P')+'-'+String.fromCharCode(65+i);
 function cartonHTML(m,i,k,ult){
@@ -522,8 +532,10 @@ document.addEventListener('click',async e=>{
   if(a==='abrir'){const i=+b.dataset.i;abiertos.has(i)?abiertos.delete(i):abiertos.add(i);return view()}
   if(a==='reintentar'){sorteoErr=null;fallos=0;for(const k in visto)delete visto[k];return view()}
   if(a==='cerrarPanel'){panelCerrado.add(b.dataset.id);return view()}
+  if(a==='dejar'){lsSet('tb_w_'+b.dataset.id,'1');if(pin===b.dataset.id)pin=null;tab='inicio';window.scrollTo(0,0);return refrescar()}
   if(a==='ocultar'){lsSet('tb_x_'+b.dataset.id,'1');if(pin===b.dataset.id)pin=null;return refrescar()}
-  if(a==='ver'){pin=b.dataset.id;tab='inicio';window.scrollTo(0,0);return refrescar()}
+  if(a==='ver'){lsSet('tb_w_'+b.dataset.id,'0');pin=b.dataset.id;tab='inicio';window.scrollTo(0,0);return refrescar()}
+  if(a==='unirse'&&b.dataset.sala==='torneo'&&!confirm('La inscripción al torneo no se devuelve. Una vez inscripto, quedás anotado aunque salgas de la pantalla. ¿Te inscribís?'))return;
   if(a==='aband'&&!confirm('Si abandonás, perdés tus cartones y tu parte del pozo. Si queda un solo jugador, gana por abandono. ¿Seguro?'))return;
   busy=true;msg=null;view();
   try{await accion(a,b)}catch(x){msg={t:'bad',x:(MSG[x.code]||'No se pudo completar. Probá de nuevo.')+(x.code?' ['+x.code+']':'')}}
@@ -564,26 +576,15 @@ async function accion(a,b){
     }
     tab='inicio';
   }
-      if(a==='salirMesa'){
-    const m=act, sala=m.sala||'principal';
-    
-    if(sala==='torneo'){
-      pin = null; // Limpiamos el pin fijo para que la app vuelva a mostrar la pantalla de inicio normal
-      msg = {t:'ok', x:'Saliste de la vista del torneo, pero ya estás inscripto. Ya podés jugar en las demás mesas.'};
-      return refrescar(); // Recargamos las vistas y mesas disponibles
-    }
-
-    // Comportamiento normal para la mesa principal o práctica
-    const n=jug?jug.cartones.length:0,costo=n*m.precio,quedan=m.participantes.length-1;
+  if(a==='salirMesa'){
+    const m=act,n=jug?jug.cartones.length:0,costo=n*m.precio,quedan=m.participantes.length-1;
     const w=writeBatch(db);
     w.delete(doc(db,'mesas',m.id,'jugadores',u));
-    w.update(doc(db,'mesas',m.id),{participantes:arrayRemove(u),pozo:increment(-costo),ncart:increment(-n),llenaEn:(sala==='principal'&&quedan>=2)?serverTimestamp():null});
+    w.update(doc(db,'mesas',m.id),{participantes:arrayRemove(u),pozo:increment(-costo),ncart:increment(-n),llenaEn:(m.sala==='principal'&&quedan>=2)?serverTimestamp():null});
     if(!m.prueba)w.update(uref,{saldo:increment(costo),mesaSalida:m.id,tipoCobro:null});
     if(!m.prueba)w.set(doc(collection(db,'movimientos')),{uid:u,tipo:'devolucion',monto:costo,detalle:m.nombre,creado:serverTimestamp()});
     await w.commit();
     if(m.prueba){try{await deleteDoc(doc(db,'mesas',m.id))}catch(e){}}
-    pin = null;
-    return refrescar();
   }
   if(a==='aband'){
     const ref=doc(db,'mesas',act.id);let fin=false,gano=false;

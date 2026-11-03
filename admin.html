@@ -41,15 +41,32 @@ const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
 const ts=t=>t&&t.toDate?t.toDate().toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'}):'';
 const dtl=t=>{if(!t||!t.toDate)return '';const d=t.toDate(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes())};
 const orden=l=>l.filter(x=>(x.jugadas||0)>0).map(x=>({...x,perd:(x.jugadas||0)-(x.ganadas||0),pct:Math.round((x.ganadas||0)/x.jugadas*100)})).sort((a,b)=>(b.ganadas||0)-(a.ganadas||0)||b.pct-a.pct||(b.jugadas||0)-(a.jugadas||0)||String(a.name||'').localeCompare(String(b.name||'')));
+const fh=t=>{try{return t&&t.toDate?t.toDate().toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'}):''}catch(e){return ''}};
+function cajaEl(){
+  const el=document.getElementById('caja');if(!el)return;
+  const sum=l=>l.reduce((a,x)=>a+Math.abs(x.monto||0),0);
+  const real=terms.filter(x=>!x.prueba);
+  const prem=x=>(x.ganQuintina?x.ganQuintina.premio||0:0)+(x.ganBingo?x.ganBingo.premio||0:0);
+  const com=x=>Math.max(0,(x.pozo||0)-prem(x));
+  const totCom=real.reduce((a,x)=>a+com(x),0),totPozo=real.reduce((a,x)=>a+(x.pozo||0),0);
+  const mov=[...mvC.map(x=>({...x,k:'c'})),...mvR.map(x=>({...x,k:'d'}))].sort((a,b)=>(b.creado&&b.creado.toMillis?b.creado.toMillis():0)-(a.creado&&a.creado.toMillis?a.creado.toMillis():0));
+  const nom=id=>{const u=us.find(x=>x.id===id);return u?u.name:'Cuenta eliminada'};
+  el.innerHTML=`<div class="mv"><span>💰 Total acreditado (${mvC.length})</span><b class="mono" style="color:var(--ok);font-size:22px">${fmt(sum(mvC))}</b></div>
+  <div class="mv"><span>💸 Total debitado / retirado (${mvR.length})</span><b class="mono" style="color:var(--bad);font-size:22px">${fmt(sum(mvR))}</b></div>
+  <div class="mv"><span>🏦 Comisión total de la casa (${real.length} partidas terminadas)</span><b class="mono gold" style="font-size:22px">${fmt(totCom)}</b><span class="note">Pozo total ${fmt(totPozo)} menos premios entregados. Si borrás el historial de mesas, esas partidas dejan de sumar acá.</span></div>
+  <h2 style="margin-top:10px">Últimos movimientos</h2>
+  ${mov.length?mov.slice(0,40).map(x=>`<div class="mv"><b style="color:var(--${x.k==='c'?'ok':'bad'})">${x.k==='c'?'＋ Acreditado':'− Debitado'} ${fmt(Math.abs(x.monto||0))}</b><span>${esc(nom(x.uid))} · ${esc(fh(x.creado))}</span><span class="note">${esc(x.detalle||'')}${x.por?' · por '+esc(x.por):''}</span></div>`).join(''):'<p class="note">Todavía no hay movimientos registrados.</p>'}
+  ${real.length?`<h2 style="margin-top:10px">Comisión por partida</h2>`+real.slice().sort((a,b)=>(b.creada&&b.creada.toMillis?b.creada.toMillis():0)-(a.creada&&a.creada.toMillis?a.creada.toMillis():0)).slice(0,15).map(x=>`<div class="mv"><b>${esc(x.nombre)} · ${esc(fh(x.creada))}</b><span>Pozo ${fmt(x.pozo||0)} · Premios ${fmt(prem(x))} · <b class="gold">Comisión ${fmt(com(x))}</b></span></div>`).join(''):''}`;
+}
 function rankEl(){
   const el=document.getElementById('rk');if(!el)return;
   const l=orden(rk).slice(0,10);
   el.innerHTML=l.length?l.map((x,i)=>`<div class="mv"><b>${i+1}º ${esc(x.name||'?')}</b><span>${x.ganadas||0} ganadas · ${x.jugadas} jugadas · ${x.perd} perdidas · ${x.pct}%</span></div>`).join(''):'<p class="note">Todavía no hay partidas contadas.</p>';
 }
-let U=null,me=null,cfg={precioCarton:500,comision:0,pctQuintina:30,pctBingo:70,segBola:6,segInicio:15,whatsapp:''},us=[],ms=[],q='',err='',ok='',unsubs=[],sl={},slOk=false,rk=[];
+let U=null,me=null,cfg={precioCarton:500,comision:0,pctQuintina:30,pctBingo:70,segBola:6,segInicio:15,whatsapp:''},us=[],ms=[],q='',err='',ok='',unsubs=[],sl={},slOk=false,rk=[],mvC=[],mvR=[],terms=[];
 
 onAuthStateChanged(auth,u=>{
-  unsubs.forEach(f=>f());unsubs=[];U=u;me=null;us=[];ms=[];sl={};slOk=false;rk=[];
+  unsubs.forEach(f=>f());unsubs=[];U=u;me=null;us=[];ms=[];sl={};slOk=false;rk=[];mvC=[];mvR=[];terms=[];
   if(u){
     unsubs.push(onSnapshot(doc(db,'users',u.uid),s=>{
       const was=me&&me.admin;me=s.exists()?s.data():null;
@@ -60,6 +77,10 @@ onAuthStateChanged(auth,u=>{
         // Las mesas fijas cambian seguido (cada vez que arranca una partida): solo se redibuja la primera vez, para no pisar lo que estás escribiendo
         unsubs.push(onSnapshot(collection(db,'salas'),s=>{sl={};s.docs.forEach(d=>{sl[d.id]=d.data()});if(!slOk){slOk=true;view()}}));
         unsubs.push(onSnapshot(query(collection(db,'stats'),orderBy('ganadas','desc'),limit(100)),s=>{rk=s.docs.map(d=>({id:d.id,...d.data()}));rankEl()}));
+        // Registro de caja: acreditaciones, débitos y partidas terminadas (para la comisión)
+        unsubs.push(onSnapshot(query(collection(db,'movimientos'),where('tipo','==','carga')),s=>{mvC=s.docs.map(d=>({id:d.id,...d.data({serverTimestamps:'estimate'})}));cajaEl()}));
+        unsubs.push(onSnapshot(query(collection(db,'movimientos'),where('tipo','==','retiro')),s=>{mvR=s.docs.map(d=>({id:d.id,...d.data({serverTimestamps:'estimate'})}));cajaEl()}));
+        unsubs.push(onSnapshot(query(collection(db,'mesas'),where('estado','==','terminada')),s=>{terms=s.docs.map(d=>({id:d.id,...d.data()}));cajaEl()}));
       }
       view();
     }));
@@ -100,12 +121,13 @@ function view(){
     <p class="note">En mesas "solo Bingo", el Bingo cobra la suma de Quintina + Bingo.</p>
     ${err?`<div class="err">${err}</div>`:''}${ok?`<div class="okm">${ok}</div>`:''}
     <button class="b1">Guardar configuración</button></form>
+  <div class="card"><h2>📒 Registro de caja</h2><div id="caja"></div></div>
   <div class="card"><h2>🏆 Ranking</h2><p class="note">Mejores jugadores por partidas ganadas (Quintina o Bingo). Solo cuentan partidas con dinero.</p><div id="rk"></div>
     <label>Cantidad de jugadores en la imagen<select id="rkn"><option value="10">Top 10</option><option value="15">Top 15</option><option value="20">Top 20</option></select></label>
     <button class="b1" data-a="png">📥 Descargar ranking (PNG)</button><p class="note">Se guarda como imagen en tu teléfono, lista para subir al grupo de WhatsApp.</p></div>
   <div class="card"><h2>Jugadores</h2><div class="note" id="cont"></div><input id="q" placeholder="Buscar por nombre o código" value="${esc(q)}" aria-label="Buscar jugador"><div id="lista"></div></div>
   <div class="card"><div class="row"><h2>Últimas mesas y resultados</h2><button class="b2" data-a="hist">🗑️ Eliminar historial</button></div><p class="note">El pozo se muestra con la comisión ya descontada.</p><div id="ms"></div></div>`;
-  lista();extras();rankEl();
+  lista();extras();rankEl();cajaEl();
 }
 function lista(){
   const el=document.getElementById('lista');if(!el)return;
