@@ -99,6 +99,10 @@ details.card summary{cursor:pointer;font-family:var(--f);font-weight:600;font-si
 .fr{position:relative;width:40px;height:40px;flex:none}.fr svg{width:40px;height:40px;transform:rotate(-90deg)}.fr .rb,.fr .rf{stroke-width:7}
 .fr b{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--f);font-size:10px;color:#e9f3ec}
 .fr.fin{display:grid;place-items:center;font-size:22px}
+.logoimg{height:34px;width:auto;display:block}
+.rk{display:grid;grid-template-columns:40px 1fr;gap:2px 8px;align-items:center;border-top:1px solid var(--line);padding:8px 0}
+.rk .pos{grid-row:span 2;font-family:var(--f);font-size:20px;text-align:center}
+.rk.yo{background:#2a2060;border-radius:10px;padding:8px}
 </style>
 </head>
 <body>
@@ -107,10 +111,10 @@ details.card summary{cursor:pointer;font-family:var(--f);font-weight:600;font-si
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,onAuthStateChanged,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {getFirestore,doc,getDoc,setDoc,addDoc,updateDoc,deleteDoc,onSnapshot,collection,query,where,writeBatch,runTransaction,serverTimestamp,arrayUnion,arrayRemove,increment} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getFirestore,doc,getDoc,setDoc,addDoc,updateDoc,deleteDoc,onSnapshot,collection,query,where,writeBatch,runTransaction,serverTimestamp,arrayUnion,arrayRemove,increment,orderBy,limit} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {firebaseConfig} from "./config.js";
 
-const VERSION='2026-10-30 · v11';
+const VERSION='2026-11-03 · v12';
 const A=document.getElementById('app'),NAV=document.getElementById('nav');
 const fmt=n=>'$'+Math.round(n||0).toLocaleString('es-AR');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -145,10 +149,10 @@ function sonar(n,extra=0){
 
 /* ---------- Estado ---------- */
 let elim=false,U=null,me=null,cfg={precioCarton:500,comision:0,pctQuintina:30,pctBingo:70,segBola:6,segInicio:15,whatsapp:''};
-let abiertas=[],mias=[],hosted=[],movs=[],act=null,jug=null,unsubs=[],unJug=null,unJugKey='';
+let abiertas=[],mias=[],hosted=[],movs=[],act=null,jug=null,unsubs=[],unJug=null,unJugKey='',salas={},ranking=[],miStat=null,contando=false;
 let pin=null,tab='inicio',modo='in',msg=null,busy=false,online=navigator.onLine,pS=null,MK={};
 const pref={prem:'ambos',cupo:'10',n:'1',tipo:'real'};
-const MSG={'mesa-cerrada':'La mesa ya empezó o cambió.','mesa-llena':'La mesa se llenó.','sin-saldo':'Saldo insuficiente.','auth/email-already-in-use':'Ese correo ya tiene una cuenta. Probá entrar.','auth/invalid-credential':'Correo o contraseña incorrectos.','auth/weak-password':'La contraseña necesita al menos 6 caracteres.','auth/invalid-email':'Escribí un correo válido.','permission-denied':'El servidor no aceptó la operación. Revisá tu saldo y que la mesa siga abierta.'};
+const MSG={'mesa-cerrada':'La mesa ya empezó o cambió.','mesa-llena':'La mesa se llenó.','sin-saldo':'Saldo insuficiente.','auth/email-already-in-use':'Ese correo ya tiene una cuenta. Probá entrar.','auth/invalid-credential':'Correo o contraseña incorrectos.','auth/weak-password':'La contraseña necesita al menos 6 caracteres.','auth/invalid-email':'Escribí un correo válido.','sala-no-disponible':'La mesa no está disponible ahora. Probá de nuevo en unos segundos.','torneo-cerrado':'La inscripción al torneo está cerrada.','permission-denied':'El servidor no aceptó la operación. Revisá tu saldo y que la mesa siga abierta.'};
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}},lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const oculta=id=>lsGet('tb_x_'+id)==='1';
 const visible=x=>{const ab=(x.abandonaron||[]).includes(U.uid);if(!ab)return true;const g=x.ganBingo;return x.estado==='terminada'&&!!g&&g.uid===U.uid&&!g.pagado};
@@ -156,7 +160,7 @@ let voz=lsGet('tb_voz')!=='0',auto=lsGet('tb_auto')==='1';const abiertos=new Set
 
 onAuthStateChanged(auth,u=>{
   unsubs.forEach(f=>f());unsubs=[];if(unJug)unJug();unJug=null;unJugKey='';
-  U=u;me=null;elim=false;abiertas=[];mias=[];hosted=[];movs=[];act=null;jug=null;pS=null;MK={};
+  U=u;me=null;elim=false;abiertas=[];mias=[];hosted=[];movs=[];act=null;jug=null;pS=null;MK={};salas={};ranking=[];miStat=null;
   if(u){
     const lista=(q,fn)=>unsubs.push(onSnapshot(q,s=>{fn(s.docs.map(d=>({id:d.id,...d.data({serverTimestamps:'estimate'})})));refrescar()}));
     unsubs.push(onSnapshot(doc(db,'users',u.uid),s=>{me=s.exists()?s.data():null;view()}));
@@ -165,7 +169,9 @@ onAuthStateChanged(auth,u=>{
     unsubs.push(onSnapshot(query(collection(db,'movimientos'),where('uid','==',u.uid)),s=>{movs=s.docs.map(d=>d.data({serverTimestamps:'estimate'}));view()}));
     lista(query(collection(db,'mesas'),where('estado','==','esperando')),l=>abiertas=l);
     lista(query(collection(db,'mesas'),where('participantes','array-contains',u.uid)),l=>mias=l);
-    lista(query(collection(db,'mesas'),where('anfitrion','==',u.uid)),l=>hosted=l);
+    unsubs.push(onSnapshot(collection(db,'salas'),s=>{salas={};s.docs.forEach(d=>{salas[d.id]=d.data({serverTimestamps:'estimate'})});view()}));
+    unsubs.push(onSnapshot(query(collection(db,'stats'),orderBy('ganadas','desc'),limit(50)),s=>{ranking=s.docs.map(d=>({id:d.id,...d.data()}));view()}));
+    unsubs.push(onSnapshot(doc(db,'stats',u.uid),s=>{miStat=s.exists()?s.data():null;view()}));
   }
   view();
 });
@@ -182,7 +188,7 @@ function refrescar(){
     if(unJug)unJug();unJug=null;jug=null;unJugKey=key;
     if(key)unJug=onSnapshot(doc(db,'mesas',key,'jugadores',U.uid),s=>{jug=s.exists()?s.data():null;view()});
   }
-  sonidos();view();
+  sonidos();view();contar();
 }
 function sonidos(){
   const m=act;if(!m){pS=null;return}
@@ -278,20 +284,20 @@ function view(){
   if(!me&&elim){NAV.style.display='none';A.innerHTML='<div class="card" style="margin-top:20px"><h1>Cuenta eliminada</h1><p>El administrador eliminó esta cuenta.</p><button class="b3" data-a="salir">Salir</button></div>';return}
   if(!me){NAV.style.display='none';A.innerHTML='<div class="card" style="margin-top:20px"><p>Cargando tu cuenta…</p></div><div class="load"></div>';return}
   NAV.style.display='flex';
-  const T=[['inicio','🏠','Inicio'],['jugar','🎲','Jugar'],['saldo','💰','Saldo'],['cuenta','👤','Cuenta']];
+  const T=[['inicio','🏠','Inicio'],['ranking','🏆','Ranking'],['saldo','💰','Saldo'],['cuenta','👤','Cuenta']];
   NAV.innerHTML='<div>'+T.map(([k,i,t])=>`<button class="${tab===k?'on':''}" data-a="tab" data-v="${k}"><span>${i}</span>${t}</button>`).join('')+'</div>';
-  const V={inicio:inicioView,jugar:jugarView,saldo:saldoView,cuenta:cuentaView}[tab];
+  const V={inicio:inicioView,ranking:rankingView,saldo:saldoView,cuenta:cuentaView}[tab];
   A.innerHTML=header()+V();
   window.scrollTo(0,y);
 }
 function header(){
   const enJuego=tab==='inicio'&&act&&act.estado!=='esperando';
-  return `<div class="top ${enJuego?'ns':''}"><div class="logo">TU <b>BINGO</b></div><div class="row"><span title="${online?'Conectado':'Sin conexión'}" role="img" aria-label="${online?'Conectado':'Sin conexión'}"><span class="dot ${online?'on':''}"></span></span><span class="chip">${fmt(me.saldo)}</span></div></div>`
+  return `<div class="top ${enJuego?'ns':''}"><img class="logoimg" src="logo.png" alt="TU BINGO"><div class="row"><span title="${online?'Conectado':'Sin conexión'}" role="img" aria-label="${online?'Conectado':'Sin conexión'}"><span class="dot ${online?'on':''}"></span></span><span class="chip">${fmt(me.saldo)}</span></div></div>`
     +(busy?'<div class="load"></div>':'')+(msg?`<div class="msg ${msg.t}" role="alert" data-a="cerrarMsg">${esc(msg.x)} <span class="note">(tocá para cerrar)</span></div>`:'');
 }
 function authView(){
   const reg=modo==='up';
-  return `<div style="margin-top:28px;text-align:center"><div class="logo" style="font-size:40px">TU <b>BINGO</b></div><p class="note">Bingo online de 90 bolillas. Mesas de 2 a 50 jugadores.</p></div>
+  return `<div style="margin-top:28px;text-align:center"><img class="logoimg" style="height:auto;width:min(300px,85%);margin:0 auto 6px" src="logo.png" alt="TU BINGO"><p class="note">Bingo online de 90 bolillas: mesa principal, torneos y práctica gratis.</p></div>
   <div class="tabs"><button class="b3 ${reg?'':'on'}" data-a="modo" data-v="in">Entrar</button><button class="b3 ${reg?'on':''}" data-a="modo" data-v="up">Crear cuenta</button></div>
   <form class="card" id="f">
     ${reg?'<input name="nombre" placeholder="Tu nombre en la mesa" maxlength="16" required autocomplete="nickname">':''}
@@ -304,9 +310,9 @@ function authView(){
 }
 function inicioView(){
   const m=act;
-  if(!m)return `<div class="card"><h2>¡Hola, ${esc(me.name)}!</h2><p class="note">Elegí una mesa para sentarte. Las mesas las arma el administrador.</p></div>`+pendHTML()
-    +(me.saldo<cfg.precioCarton?`<div class="card"><b>Tu saldo es ${fmt(me.saldo)}</b><p class="note">Un cartón cuesta ${fmt(cfg.precioCarton)}. Cargá saldo para poder jugar.</p>${abiertas.some(x=>x.prueba)?'<p class="note">Mientras tanto, podés practicar gratis en las mesas de práctica.</p>':''}<button class="b3" data-a="tab" data-v="saldo">Ir a Mi saldo</button></div>`:'')
-    +mesasAbiertas(false);
+  if(!m)return `<div class="card"><h2>¡Hola, ${esc(me.name)}!</h2><p class="note">Elegí una mesa para jugar.</p></div>`+pendHTML()
+    +(me.saldo<cfg.precioCarton?`<div class="card"><b>Tu saldo es ${fmt(me.saldo)}</b><p class="note">Un cartón cuesta ${fmt(cfg.precioCarton)}. Cargá saldo para jugar en la mesa principal o en el torneo.${salaCfg('prueba').activa?' Mientras tanto, podés practicar gratis.':''}</p><button class="b3" data-a="tab" data-v="saldo">Ir a Mi saldo</button></div>`:'')
+    +salasHTML();
   return m.estado==='esperando'?esperaView(m):juegoView(m);
 }
 function pend(){
@@ -328,32 +334,57 @@ function finPanel(m){
     ${m.premios==='ambos'?fila('QUINTINA',gq):''}${fila('BINGO',gb)}
     <div class="det"><span>Pozo</span><b>${m.prueba?'Práctica':fmt(pozoNeto(m))}</b><span>Jugadores</span><b>${m.participantes.length}</b><span>Cartones</span><b>${m.ncart||0}</b><span>Bolillas sorteadas</span><b>${s.length}/90</b><span>Última bolilla</span><b>${s.length?s[s.length-1]:'—'}</b></div>
     ${mios.map(x=>`<button class="b1" data-a="cobrar" data-t="${x.t}" data-id="${m.id}" ${busy?'disabled':''}>Cobrar ${x.t==='q'?'Quintina':'Bingo'} · ${fmt(x.g.premio)}</button>`).join('')}
-    ${part?`<button class="b2" data-a="revancha" data-id="${m.id}" ${busy?'disabled':''}>🔁 Jugar de nuevo en esta mesa</button>`:''}
+    <button class="b2" data-a="ocultar" data-id="${m.id}">🔁 Volver a las mesas</button>
     <div class="acts"><button class="b3" data-a="cerrarPanel" data-id="${m.id}">Ver la mesa</button><button class="b3" data-a="ocultar" data-id="${m.id}">Salir</button></div>
   </div></div>`;
 }
 const pLabel=m=>(m.prueba?'🎓 Práctica · ':'')+(m.premios==='ambos'?'Quintina y Bingo':'Solo Bingo');
-function unirseCtl(m){
-  const pr=m.prueba?0:m.precio;
-  return `<select data-pref="n" aria-label="Cantidad de cartones">${[1,2,3,4,5,6].map(i=>`<option value="${i}" ${pref.n==i?'selected':''}>${i} ${i===1?'cartón':'cartones'} · ${m.prueba?'gratis':fmt(i*pr)}</option>`).join('')}</select>
-  <button class="b1" data-a="unirse" data-id="${m.id}" ${busy||m.participantes.length>=m.cupo||me.saldo<(+pref.n)*pr?'disabled':''}>${me.saldo<(+pref.n)*pr?'Saldo insuficiente':m.participantes.length>=m.cupo?'Mesa llena':'Sentarme'}</button>`;
+const SALAS_NOM={principal:'Mesa principal',torneo:'Torneo',prueba:'Práctica'};
+// Datos de cada mesa fija (con los mismos valores por defecto que usan las reglas de Firebase)
+const salaCfg=s=>{const d=salas[s]||{};return{cupo:d.cupo||(s==='principal'?30:50),premios:d.premios||'ambos',precio:s==='torneo'?(d.precio||cfg.precioCarton):cfg.precioCarton,activa:d.activa===true,fecha:d.fecha&&d.fecha.toMillis?d.fecha.toMillis():0}};
+const mesaSala=s=>{const a=salas[s]&&salas[s].actual;return a?(abiertas.find(x=>x.id===a&&x.estado==='esperando')||null):null};
+const fechaTxt=ms=>cap(new Date(ms).toLocaleString('es-AR',{dateStyle:'full',timeStyle:'short'}));
+function cuentaTorneo(){
+  const ms=salaCfg('torneo').fecha-Date.now();if(ms<=0)return 'unos segundos';
+  const s=Math.floor(ms/1000),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),mi=Math.floor(s%3600/60),se=s%60;
+  return (d?d+' d ':'')+(d||h?h+' h ':'')+mi+' min '+se+' s';
+}
+function unirseCtl(s,m){
+  const c=salaCfg(s),pr=s==='prueba'?0:c.precio,lleno=!!m&&m.participantes.length>=c.cupo,cierra=s==='torneo'&&!(c.fecha>Date.now()),sin=me.saldo<(+pref.n)*pr;
+  const txt=sin?'Saldo insuficiente':lleno?'Mesa llena':cierra?'Inscripción cerrada':s==='prueba'?'Empezar práctica':s==='torneo'?'Inscribirme':'Sentarme';
+  return `<select data-pref="n" aria-label="Cantidad de cartones">${[1,2,3,4,5,6].map(i=>`<option value="${i}" ${pref.n==i?'selected':''}>${i} ${i===1?'cartón':'cartones'} · ${s==='prueba'?'gratis':fmt(i*pr)}</option>`).join('')}</select>
+  <button class="b1" data-a="unirse" data-sala="${s}" data-id="${m?m.id:''}" ${busy||lleno||sin||cierra?'disabled':''}>${txt}</button>`;
+}
+function salasHTML(){
+  const P=salaCfg('principal'),T=salaCfg('torneo'),X=salaCfg('prueba'),mp=mesaSala('principal'),mt=mesaSala('torneo');
+  const np=mp?mp.participantes.length:0,nt=mt?mt.participantes.length:0,abierto=T.fecha>Date.now();
+  return `<h2>Mesas</h2>
+  <div class="card"><div class="row"><h2>🎱 Mesa principal</h2><span class="chip">${np}/${P.cupo}</span></div>
+    <p class="note">${P.premios==='ambos'?'Quintina y Bingo':'Solo Bingo'} · Cartón ${fmt(P.precio)} · Pozo ${fmt(mp?pozoNeto(mp):0)}</p>
+    <p class="note">Entrá cuando quieras. Con 2 jugadores empieza una cuenta regresiva de ${cfg.segInicio||15} segundos; si se suma alguien más, vuelve a empezar.</p>
+    ${unirseCtl('principal',mp)}</div>
+  <div class="card"><div class="row"><h2>🏆 Torneo</h2><span class="chip">${nt}/${T.cupo}</span></div>
+    <p class="note">${T.premios==='ambos'?'Quintina y Bingo':'Solo Bingo'} · Inscripción ${fmt(T.precio)} por cartón · Pozo ${fmt(mt?pozoNeto(mt):0)}</p>
+    ${abierto?`<p><b class="gold">${esc(fechaTxt(T.fecha))}</b></p><p class="note">Faltan <b id="cdt">${cuentaTorneo()}</b>. Empieza sola a esa hora si hay al menos 2 inscriptos.</p>${unirseCtl('torneo',mt)}`:'<p class="note">Todavía no hay fecha programada para el próximo torneo. El administrador la va a anunciar.</p>'}</div>
+  ${X.activa?`<div class="card"><h2>🎓 Mesa de práctica</h2><p class="note">Jugá gratis, solo y sin esperar rivales. No usa saldo ni reparte premios, ni cuenta para el ranking.</p>${unirseCtl('prueba',null)}</div>`:''}`;
 }
 function esperaView(m){
-  const soy=m.participantes.includes(U.uid),host=m.anfitrion===U.uid,n=m.participantes.length;
+  const n=m.participantes.length,sala=m.sala||'principal',T=salaCfg('torneo');
   const txt=encodeURIComponent(`Te espero en ${m.nombre} de TU BINGO. ${m.prueba?'Mesa de práctica gratis.':'Cartón: '+fmt(m.precio)+'.'} ${location.href}`);
+  let estado;
+  if(cuentaActiva(m))estado=`<div class="card" style="text-align:center"><h2>¡La partida está por empezar!</h2><p>Empieza en <b id="cdi" class="mono gold" style="font-size:30px">${restaInicio(m)}</b> segundos</p>${sala==='principal'?'<p class="note">Si se suma otro jugador, la cuenta regresiva vuelve a empezar.</p>':''}</div>`;
+  else if(sala==='torneo')estado=`<div class="card" style="text-align:center"><h2>Torneo programado</h2>${T.fecha?`<p class="gold"><b>${esc(fechaTxt(T.fecha))}</b></p><p>Faltan <b id="cdt" class="mono gold">${cuentaTorneo()}</b></p>`:'<p class="note">El administrador todavía no fijó la fecha.</p>'}<p class="note">${n<2?'Hacen falta al menos 2 inscriptos para empezar.':'Empieza sola a la hora indicada.'} Podés salir y recuperar tu saldo hasta que empiece.</p></div>`;
+  else estado=`<div class="card"><b>Esperando jugadores</b><p class="note">Con 2 jugadores empieza una cuenta regresiva de ${cfg.segInicio||15} segundos. Una vez iniciada la partida, no se pueden sumar más jugadores.</p></div>`;
   return `<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="chip">${n}/${m.cupo}</span></div>
-    <p class="note">${m.prueba?pLabel(m)+' · Sin dinero: no usa tu saldo':'Premios: '+pLabel(m)+' · Cartón '+fmt(m.precio)} · Organiza: ${esc(m.anfitrionNombre||'')}</p>
+    <p class="note">${m.prueba?pLabel(m)+' · Sin dinero: no usa tu saldo':'Premios: '+pLabel(m)+' · Cartón '+fmt(m.precio)}</p>
     ${m.prueba?'':`<div class="row"><span>Pozo acumulado</span><b class="mono gold" style="font-size:24px">${fmt(pozoNeto(m))}</b></div>`}</div>
-  <div class="card"><h2>Jugadores sentados</h2>${n?`<ul>${m.participantes.map(u=>`<li>${esc((m.nombres||{})[u]||'Jugador')}${u===m.anfitrion?' (anfitrión)':''}</li>`).join('')}</ul>`:'<p class="note">Todavía no se sentó nadie.</p>'}
-    ${soy&&jug?`<p class="note">Tus cartones: ${jug.cartones.length}</p>`:''}</div>
-  ${!soy&&!m.llenaEn?`<div class="card"><h2>Sentate en la mesa</h2>${unirseCtl(m)}</div>`:''}
-  ${m.llenaEn&&(n>=m.cupo||m.forzada)?`<div class="card" style="text-align:center"><h2>${n>=m.cupo?'¡Mesa completa!':'¡Inicio de emergencia!'}</h2><p>La partida empieza en <b id="cdi" class="mono gold" style="font-size:30px">${restaInicio(m)}</b> segundos</p></div>`:`<div class="card"><b>Faltan ${Math.max(0,m.cupo-n)} jugador${m.cupo-n===1?'':'es'} para completar la mesa.</b><p class="note">La partida empieza sola cuando se completen los ${m.cupo} jugadores, con una cuenta regresiva de ${cfg.segInicio||15} segundos. Una vez iniciada, no se pueden sumar más jugadores.</p></div>`}
-  ${host?(m.llenaEn&&m.forzada?`<button class="b3" data-a="cancelarInicio" data-id="${m.id}" ${busy?'disabled':''}>Cancelar el inicio de emergencia</button>`:(m.llenaEn?'':`<button class="b3" data-a="iniciar" data-id="${m.id}" ${busy||n<1?'disabled':''}>⚠️ Iniciar partida (emergencia)</button>`)):''}
-  <a class="btn b3" target="_blank" rel="noopener" href="https://wa.me/?text=${txt}">Invitar por WhatsApp</a>
-  ${soy?`<button class="b4" data-a="salirMesa" ${busy||(host&&n>1)?'disabled':''}>Salir de la mesa${m.prueba?'':' (te devolvemos tu saldo)'}</button>`:''}
-  ${host&&n===0?`<button class="b4" data-a="cancelar" data-id="${m.id}" ${busy?'disabled':''}>Cancelar mesa</button>`:''}`;
+  <div class="card"><h2>Jugadores sentados</h2>${n?`<ul>${m.participantes.map(u=>`<li>${esc((m.nombres||{})[u]||'Jugador')}</li>`).join('')}</ul>`:'<p class="note">Todavía no se sentó nadie.</p>'}
+    ${jug?`<p class="note">Tus cartones: ${jug.cartones.length}</p>`:''}</div>
+  ${estado}
+  ${m.prueba?'':`<a class="btn b3" target="_blank" rel="noopener" href="https://wa.me/?text=${txt}">Invitar por WhatsApp</a>`}
+  <button class="b4" data-a="salirMesa" ${busy?'disabled':''}>Salir de la mesa${m.prueba?'':' (te devolvemos tu saldo)'}</button>`;
 }
-const cid=(m,i)=>'#'+(m.nombre.replace(/\D/g,'')||'0')+'-'+String.fromCharCode(65+i);
+const cid=(m,i)=>'#'+(m.sala==='torneo'?'T':m.sala==='prueba'?'X':'P')+'-'+String.fromCharCode(65+i);
 function cartonHTML(m,i,k,ult){
   const c=k.c,a=analiza(m,i,c),n=jug.cartones.length;
   return `<div class="cc">
@@ -395,28 +426,52 @@ function juegoView(m){
   return `${barra}${ctl}${prem}${fin}${cobro(gq,'q','Quintina')}${cobro(gb,'b','Bingo')}${cards}
   <div class="card"><h2>Tablero de 90 números</h2><div class="t90">${Array.from({length:90},(_,i)=>i+1).map(n=>s.includes(n)?`<span class="t s" style="background:${col(n)}">${n}</span>`:`<span class="t">${n}</span>`).join('')}</div></div>${finPanel(m)}`;
 }
-function mesasAbiertas(ocupado){
-  const lista=abiertas.filter(m=>(m.participantes.length<m.cupo&&!m.llenaEn)||m.participantes.includes(U.uid));
-  return '<h2>Mesas disponibles</h2>'+(lista.length?lista.map(m=>`<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="chip">${m.participantes.length}/${m.cupo}</span></div>
-    <p class="note">${m.prueba?pLabel(m)+' · Gratis, sin usar saldo':pLabel(m)+' · Cartón '+fmt(m.precio)+' · Pozo '+fmt(pozoNeto(m))}</p>
-    ${ocupado||(act&&act.estado!=='terminada')||m.participantes.includes(U.uid)?'<p class="note">Ya estás en una mesa.</p>':unirseCtl(m)}</div>`).join(''):'<div class="card"><p class="note">Por ahora no hay mesas disponibles. El administrador las va a abrir.</p></div>');
+const medalla=i=>['🥇','🥈','🥉'][i]||(i+1)+'º';
+function ordenRanking(l){
+  return l.filter(x=>(x.jugadas||0)>0).map(x=>({...x,perd:(x.jugadas||0)-(x.ganadas||0),pct:Math.round((x.ganadas||0)/x.jugadas*100)}))
+    .sort((a,b)=>(b.ganadas||0)-(a.ganadas||0)||b.pct-a.pct||(b.jugadas||0)-(a.jugadas||0)||String(a.name||'').localeCompare(String(b.name||'')));
 }
-function jugarView(){
-  const ocupado=act&&act.estado!=='terminada';
-  let h=ocupado?`<div class="card"><b>Ya estás en la mesa ${esc(act.nombre)}.</b><button class="b3" data-a="tab" data-v="inicio">Ir a mi mesa</button></div>`:'';
-  if(me.admin){
-    const mias=hosted.filter(m=>m.estado!=='terminada'&&!oculta(m.id));
-    h+=`<div class="card"><h2>Armar mesa (administrador)</h2>
-      <label class="note">Premios<select data-pref="prem"><option value="ambos" ${pref.prem==='ambos'?'selected':''}>Quintina y Bingo</option><option value="bingo" ${pref.prem==='bingo'?'selected':''}>Solo Bingo</option></select></label>
-      <label class="note">Cantidad máxima de jugadores<select data-pref="cupo">${Array.from({length:49},(_,i)=>i+2).map(n=>`<option value="${n}" ${pref.cupo==n?'selected':''}>${n} jugadores</option>`).join('')}</select></label>
-      <label class="note">Tipo de mesa<select data-pref="tipo"><option value="real" ${pref.tipo==='real'?'selected':''}>Con dinero (usa saldo)</option><option value="prueba" ${pref.tipo==='prueba'?'selected':''}>Práctica (sin saldo, para aprender)</option></select></label>
-      <p class="note">${pref.tipo==='prueba'?'Mesa de práctica: gratis, no mueve saldo ni reparte premios.':'Cartón: '+fmt(cfg.precioCarton)+'.'} La partida empieza sola cuando se completa el cupo, con una cuenta regresiva. Una vez iniciada, nadie más puede sumarse.</p>
-      <button class="b1" data-a="crear" ${busy?'disabled':''}>Crear mesa</button></div>`;
-    if(mias.length)h+='<h2>Mis mesas</h2>'+mias.map(m=>`<div class="card"><div class="row"><h2>${esc(m.nombre)}</h2><span class="chip">${m.participantes.length}/${m.cupo}</span></div>
-      <p class="note">${m.estado==='esperando'?'Esperando jugadores':'En juego · '+m.sorteadas.length+' bolillas'} · ${pLabel(m)}${m.prueba?'':' · Pozo '+fmt(pozoNeto(m))}</p>
-      <div class="acts"><button class="b3" data-a="ver" data-id="${m.id}">Abrir</button>${m.estado==='esperando'&&m.participantes.length>=1&&!m.llenaEn?`<button class="b3" data-a="iniciar" data-id="${m.id}" ${busy?'disabled':''}>⚠️ Iniciar (emergencia)</button>`:''}${m.estado==='esperando'&&m.forzada&&m.llenaEn?`<button class="b3" data-a="cancelarInicio" data-id="${m.id}" ${busy?'disabled':''}>Cancelar inicio</button>`:''}${m.estado==='esperando'&&m.participantes.length===0?`<button class="b4" data-a="cancelar" data-id="${m.id}" ${busy?'disabled':''}>Cancelar</button>`:''}</div></div>`).join('');
-  }
-  return h+mesasAbiertas(ocupado);
+function rankingView(){
+  const l=ordenRanking(ranking).slice(0,20),y=miStat;
+  return `<div class="card"><h2>📊 Mis estadísticas</h2>${y&&y.jugadas?`<div class="prem"><div>Jugadas<b>${y.jugadas}</b></div><div>Ganadas<b>${y.ganadas||0}</b></div><div>Perdidas<b>${y.jugadas-(y.ganadas||0)}</b></div><div>Efectividad<b>${Math.round((y.ganadas||0)/y.jugadas*100)}%</b></div></div>`:'<p class="note">Todavía no tenés partidas contadas.</p>'}<p class="note">Cuentan las partidas con dinero (mesa principal y torneo). La práctica no cuenta. Ganada = ganaste Quintina o Bingo.</p></div>
+  <div class="card"><h2>🏆 Mejores jugadores</h2>${l.length?l.map((x,i)=>`<div class="rk ${x.id===U.uid?'yo':''}"><span class="pos">${medalla(i)}</span><b>${esc(x.name||'Jugador')}${x.id===U.uid?' (vos)':''}</b><span class="note">${x.ganadas||0} ganadas · ${x.jugadas} jugadas · ${x.perd} perdidas · ${x.pct}%</span></div>`).join(''):'<p class="note">Todavía no hay partidas terminadas.</p>'}</div>`;
+}
+// Suma al ranking cada partida terminada (una sola vez por partida; las reglas de Firebase lo verifican)
+async function contar(){
+  if(contando||!U||!me)return;contando=true;
+  try{
+    for(const m of mias){
+      const k='tb_st_'+m.id+'_'+U.uid;
+      if(m.estado!=='terminada'||m.prueba||lsGet(k))continue;
+      try{
+        const sref=doc(db,'stats',U.uid),sd=await getDoc(sref),p=sd.exists()?sd.data():{jugadas:0,ganadas:0,bingos:0,quintinas:0};
+        const b=m.ganBingo&&m.ganBingo.uid===U.uid?1:0,q=m.ganQuintina&&m.ganQuintina.uid===U.uid?1:0;
+        const w=writeBatch(db);
+        w.set(doc(db,'stats',U.uid,'partidas',m.id),{creado:serverTimestamp()});
+        w.set(sref,{name:me.name,jugadas:(p.jugadas||0)+1,ganadas:(p.ganadas||0)+((b+q)>0?1:0),bingos:(p.bingos||0)+b,quintinas:(p.quintinas||0)+q,ultima:m.id});
+        await w.commit();lsSet(k,'1');
+      }catch(e){if(e.code==='permission-denied')lsSet(k,'1')}
+    }
+  }finally{contando=false}
+}
+// Mesas fijas: la principal y el torneo siempre tienen una mesa esperando jugadores
+async function asegurarSala(s){
+  if(s!=='principal'&&s!=='torneo')return null;
+  const sref=doc(db,'salas',s);
+  const leer=async()=>{const sd=await getDoc(sref),a=sd.exists()?sd.data().actual:null;if(!a)return null;const md=await getDoc(doc(db,'mesas',a));return md.exists()&&md.data().estado==='esperando'?a:null};
+  const ya=await leer();if(ya)return ya;
+  const c=salaCfg(s),nref=doc(collection(db,'mesas'));
+  try{
+    const w=writeBatch(db);
+    w.set(nref,{nombre:SALAS_NOM[s],sala:s,anfitrion:U.uid,anfitrionNombre:me.name,premios:c.premios,cupo:c.cupo,precio:c.precio,estado:'esperando',participantes:[],nombres:{},pozo:0,ncart:0,sorteadas:[],abandonaron:[],llenaEn:null,origen:null,ultimaBola:serverTimestamp(),ganQuintina:null,ganBingo:null,creada:serverTimestamp()});
+    w.set(sref,{actual:nref.id},{merge:true});
+    await w.commit();return nref.id;
+  }catch(e){return await leer()}
+}
+async function crearPrueba(){
+  const ref=doc(collection(db,'mesas'));
+  await setDoc(ref,{nombre:SALAS_NOM.prueba,sala:'prueba',anfitrion:U.uid,anfitrionNombre:me.name,premios:'ambos',cupo:1,precio:0,prueba:true,estado:'esperando',participantes:[],nombres:{},pozo:0,ncart:0,sorteadas:[],abandonaron:[],llenaEn:null,origen:null,ultimaBola:serverTimestamp(),ganQuintina:null,ganBingo:null,creada:serverTimestamp()});
+  return ref.id;
 }
 const TIPO={carga:'Carga de saldo',compra:'Compra de cartones',premio:'Premio cobrado',devolucion:'Devolución',ajuste:'Ajuste',retiro:'Retiro'};
 function saldoView(){
@@ -469,7 +524,6 @@ document.addEventListener('click',async e=>{
   if(a==='cerrarPanel'){panelCerrado.add(b.dataset.id);return view()}
   if(a==='ocultar'){lsSet('tb_x_'+b.dataset.id,'1');if(pin===b.dataset.id)pin=null;return refrescar()}
   if(a==='ver'){pin=b.dataset.id;tab='inicio';window.scrollTo(0,0);return refrescar()}
-  if(a==='iniciar'&&!confirm('Vas a iniciar la partida sin esperar a que se complete la mesa. Empieza una cuenta regresiva y nadie más podrá sentarse. Usalo solo en una emergencia. ¿Seguro?'))return;
   if(a==='aband'&&!confirm('Si abandonás, perdés tus cartones y tu parte del pozo. Si queda un solo jugador, gana por abandono. ¿Seguro?'))return;
   busy=true;msg=null;view();
   try{await accion(a,b)}catch(x){msg={t:'bad',x:(MSG[x.code]||'No se pudo completar. Probá de nuevo.')+(x.code?' ['+x.code+']':'')}}
@@ -478,54 +532,48 @@ document.addEventListener('click',async e=>{
 
 async function accion(a,b){
   const u=U.uid,uref=doc(db,'users',u);
-  if(a==='crear'){
-    await addDoc(collection(db,'mesas'),{nombre:(pref.tipo==='prueba'?'Práctica #':'Mesa #')+(100+Math.floor(Math.random()*900)),anfitrion:u,anfitrionNombre:me.name,premios:pref.prem,cupo:+pref.cupo,precio:pref.tipo==='prueba'?0:cfg.precioCarton,...(pref.tipo==='prueba'?{prueba:true}:{}),estado:'esperando',participantes:[],nombres:{},pozo:0,ncart:0,sorteadas:[],abandonaron:[],llenaEn:null,origen:null,ultimaBola:serverTimestamp(),ganQuintina:null,ganBingo:null,creada:serverTimestamp()});
-    tab='inicio';
-  }
-  if(a==='cancelar')await deleteDoc(doc(db,'mesas',b.dataset.id||act.id));
   if(a==='unirse'){
-    const mref=doc(db,'mesas',b.dataset.id),n=+pref.n;
-    await runTransaction(db,async t=>{
-      const d=(await t.get(mref)).data(),costo=d.prueba?0:n*d.precio;
-      if(d.estado!=='esperando'||d.llenaEn||d.participantes.includes(u))throw{code:'mesa-cerrada'};
-      if(d.participantes.length>=d.cupo)throw{code:'mesa-llena'};
-      if(me.saldo<costo)throw{code:'sin-saldo'};
-      const lleno=d.participantes.length+1>=d.cupo,datos={participantes:[...d.participantes,u],pozo:d.pozo+costo,ncart:(d.ncart||0)+n,['nombres.'+u]:me.name};
-      if(lleno)datos.llenaEn=serverTimestamp();
-      t.set(doc(db,'mesas',mref.id,'jugadores',u),{uid:u,name:me.name,cartones:Array.from({length:n},()=>cartonDoc())});
-      t.update(mref,datos);
-      if(!d.prueba)t.update(uref,{saldo:increment(-costo)});
-      if(!d.prueba)t.set(doc(collection(db,'movimientos')),{uid:u,tipo:'compra',monto:-costo,detalle:d.nombre+' · '+n+(n===1?' cartón':' cartones'),creado:serverTimestamp()});
-    });
+    const sl=b.dataset.sala,n=+pref.n;
+    const entrar=async mid=>{
+      const mref=doc(db,'mesas',mid);
+      await runTransaction(db,async t=>{
+        const d=(await t.get(mref)).data(),costo=d.prueba?0:n*d.precio;
+        if(d.estado!=='esperando'||d.participantes.includes(u))throw{code:'mesa-cerrada'};
+        if(d.participantes.length>=d.cupo)throw{code:'mesa-llena'};
+        if(me.saldo<costo)throw{code:'sin-saldo'};
+        if(d.sala==='torneo'&&!(salaCfg('torneo').fecha>Date.now()))throw{code:'torneo-cerrado'};
+        const datos={participantes:[...d.participantes,u],pozo:d.pozo+costo,ncart:(d.ncart||0)+n,['nombres.'+u]:me.name};
+        if(d.sala==='prueba'||(d.sala==='principal'&&d.participantes.length+1>=2))datos.llenaEn=serverTimestamp();
+        t.set(doc(db,'mesas',mref.id,'jugadores',u),{uid:u,name:me.name,cartones:Array.from({length:n},()=>cartonDoc())});
+        t.update(mref,datos);
+        if(!d.prueba)t.update(uref,{saldo:increment(-costo)});
+        if(!d.prueba)t.set(doc(collection(db,'movimientos')),{uid:u,tipo:'compra',monto:-costo,detalle:d.nombre+' · '+n+(n===1?' cartón':' cartones'),creado:serverTimestamp()});
+      });
+    };
+    if(sl==='prueba'){
+      const mid=await crearPrueba();
+      try{await entrar(mid)}catch(e){try{await deleteDoc(doc(db,'mesas',mid))}catch(_){}throw e}
+    }else{
+      const v=mesaSala(sl);let mid=v?v.id:await asegurarSala(sl);
+      if(!mid)throw{code:'sala-no-disponible'};
+      try{await entrar(mid)}catch(e){
+        if(e.code!=='mesa-cerrada')throw e;
+        mid=await asegurarSala(sl);if(!mid)throw{code:'sala-no-disponible'};
+        await entrar(mid);
+      }
+    }
     tab='inicio';
   }
   if(a==='salirMesa'){
-    const m=act,n=jug?jug.cartones.length:0,costo=n*m.precio;
+    const m=act,n=jug?jug.cartones.length:0,costo=n*m.precio,quedan=m.participantes.length-1;
     const w=writeBatch(db);
     w.delete(doc(db,'mesas',m.id,'jugadores',u));
-    w.update(doc(db,'mesas',m.id),{participantes:arrayRemove(u),pozo:increment(-costo),ncart:increment(-n),llenaEn:null,forzada:false});
+    w.update(doc(db,'mesas',m.id),{participantes:arrayRemove(u),pozo:increment(-costo),ncart:increment(-n),llenaEn:(m.sala==='principal'&&quedan>=2)?serverTimestamp():null});
     if(!m.prueba)w.update(uref,{saldo:increment(costo),mesaSalida:m.id,tipoCobro:null});
     if(!m.prueba)w.set(doc(collection(db,'movimientos')),{uid:u,tipo:'devolucion',monto:costo,detalle:m.nombre,creado:serverTimestamp()});
     await w.commit();
+    if(m.prueba){try{await deleteDoc(doc(db,'mesas',m.id))}catch(e){}}
   }
-  if(a==='revancha'){
-    const id0=b.dataset.id,r0=doc(db,'mesas',id0),f=(await getDoc(r0)).data();
-    let sig=f.siguiente;
-    if(!sig){
-      const nref=doc(collection(db,'mesas'));
-      try{
-        const w=writeBatch(db);
-        w.set(nref,{nombre:f.nombre,anfitrion:f.anfitrion,anfitrionNombre:f.anfitrionNombre,premios:f.premios,cupo:f.cupo,precio:f.prueba?0:cfg.precioCarton,...(f.prueba?{prueba:true}:{}),estado:'esperando',participantes:[],nombres:{},pozo:0,ncart:0,sorteadas:[],abandonaron:[],llenaEn:null,origen:id0,ultimaBola:serverTimestamp(),ganQuintina:null,ganBingo:null,creada:serverTimestamp()});
-        w.update(r0,{siguiente:nref.id});
-        await w.commit();sig=nref.id;
-      }catch(e){const f2=(await getDoc(r0)).data();if(f2.siguiente)sig=f2.siguiente;else throw e}
-    }
-    lsSet('tb_x_'+id0,'1');pinA=sig;tab='inicio';window.scrollTo(0,0);
-    msg={t:'ok',x:'Mesa lista. Elegí tus cartones y sentate para jugar de nuevo.'};
-    refrescar();
-  }
-  if(a==='iniciar')await updateDoc(doc(db,'mesas',b.dataset.id||act.id),{llenaEn:serverTimestamp(),forzada:true});
-  if(a==='cancelarInicio')await updateDoc(doc(db,'mesas',b.dataset.id||act.id),{llenaEn:null,forzada:false});
   if(a==='aband'){
     const ref=doc(db,'mesas',act.id);let fin=false,gano=false;
     await runTransaction(db,async t=>{
@@ -663,37 +711,50 @@ setInterval(()=>{
   if(rg)rg.style.strokeDashoffset=String(163.4*(rem/seg));
 },200);
 
-/* ---------- Inicio automático (mesa completa o inicio de emergencia) ---------- */
-// Cuando se llena el cupo, o el administrador fuerza el inicio, empieza una cuenta regresiva.
-// Al terminar, cualquier jugador conectado de la mesa inicia la partida.
+/* ---------- Inicio automático ---------- */
+// Mesa principal: con 2 o más jugadores corre una cuenta regresiva y cada jugador nuevo la reinicia.
+// Torneo: empieza a la fecha programada (con 2 o más inscriptos). Práctica: cuenta corta de 5 segundos.
+// Al terminar, cualquier jugador conectado de la mesa inicia la partida; las reglas de Firebase verifican la hora.
 const vistoLleno={},iniciando={},jit2={},anunciado={};
-const segInicioMs=()=>Math.max(5,+cfg.segInicio||15)*1000;
-const restaInicio=m=>{const v=vistoLleno[m.id]||Date.now();return Math.max(0,Math.ceil((segInicioMs()-(Date.now()-v))/1000))};
-const cuentaActiva=m=>m.estado==='esperando'&&!!m.llenaEn&&(m.participantes.length>=m.cupo||!!m.forzada);
+const segInicioMs=m=>m&&m.sala==='prueba'?5000:Math.max(5,+cfg.segInicio||15)*1000;
+const restaInicio=m=>{const v=vistoLleno[m.id];return v?Math.max(0,Math.ceil((segInicioMs(m)-(Date.now()-v.t))/1000)):Math.ceil(segInicioMs(m)/1000)};
+const cuentaActiva=m=>m.estado==='esperando'&&m.sala!=='torneo'&&!!m.llenaEn&&m.participantes.length>=(m.sala==='prueba'?1:2);
+const torneoListo=m=>{const f=salaCfg('torneo').fecha;return m.estado==='esperando'&&m.sala==='torneo'&&m.participantes.length>=2&&f>0&&Date.now()>=f};
 async function iniciarMesa(m){
   iniciando[m.id]=Date.now();
   try{
     const ref=doc(db,'mesas',m.id);
     await runTransaction(db,async t=>{
       const d=(await t.get(ref)).data();
-      if(d.estado!=='esperando'||!d.llenaEn||!(d.participantes.length>=d.cupo||d.forzada)||d.participantes.length<1)return;
+      if(d.estado!=='esperando'||d.participantes.length<(d.sala==='prueba'?1:2))return;
       t.update(ref,{estado:'jugando',ultimaBola:serverTimestamp()});
     });
+    asegurarSala(m.sala).catch(()=>{});
   }catch(e){}
 }
 setInterval(()=>{
   if(!U)return;
-  const todas=new Map();[...mias,...hosted].forEach(m=>todas.set(m.id,m));
-  todas.forEach(m=>{
-    if(!cuentaActiva(m)){delete vistoLleno[m.id];delete anunciado[m.id];return}
-    if(!vistoLleno[m.id]){vistoLleno[m.id]=Date.now();view()}
-    if(jit2[m.id]===undefined)jit2[m.id]=Math.floor(Math.random()*1500);
-    if(Date.now()-vistoLleno[m.id]>=segInicioMs()+jit2[m.id]&&Date.now()-(iniciando[m.id]||0)>4000)iniciarMesa(m);
+  mias.forEach(m=>{
+    if(m.estado!=='esperando'){delete vistoLleno[m.id];delete anunciado[m.id];return}
+    let listo=false;
+    if(cuentaActiva(m)){
+      const v=vistoLleno[m.id];
+      if(!v||v.n!==m.participantes.length){vistoLleno[m.id]={n:m.participantes.length,t:Date.now()};delete anunciado[m.id];delete jit2[m.id];view()}
+      if(jit2[m.id]===undefined)jit2[m.id]=Math.floor(Math.random()*1500);
+      listo=Date.now()-vistoLleno[m.id].t>=segInicioMs(m)+jit2[m.id];
+    }else{
+      delete vistoLleno[m.id];delete anunciado[m.id];
+      if(torneoListo(m)){if(jit2[m.id]===undefined)jit2[m.id]=Math.floor(Math.random()*1500);listo=Date.now()>=salaCfg('torneo').fecha+jit2[m.id]}
+    }
+    if(listo&&Date.now()-(iniciando[m.id]||0)>4000)iniciarMesa(m);
   });
-  if(act&&cuentaActiva(act)){
-    const r=restaInicio(act),el=document.getElementById('cdi');if(el)el.textContent=r;
-    if(r>=1&&r<=5&&anunciado[act.id]!==r){anunciado[act.id]=r;sonar('tick');const t=decirCuenta(r);if(t)hablarTexto(t)}
+  if(act&&act.estado==='esperando'){
+    if(cuentaActiva(act)){
+      const r=restaInicio(act),el=document.getElementById('cdi');if(el)el.textContent=r;
+      if(r>=1&&r<=5&&anunciado[act.id]!==r){anunciado[act.id]=r;sonar('tick');const t=decirCuenta(r);if(t)hablarTexto(t)}
+    }
   }
+  const ct=document.getElementById('cdt');if(ct)ct.textContent=cuentaTorneo();
 },400);
 </script>
 </body>
