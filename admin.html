@@ -44,8 +44,10 @@ const orden=l=>l.filter(x=>(x.jugadas||0)>0).map(x=>({...x,perd:(x.jugadas||0)-(
 const fh=t=>{try{return t&&t.toDate?t.toDate().toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'}):''}catch(e){return ''}};
 function cajaEl(){
   const el=document.getElementById('caja');if(!el)return;
+  const ms_=t=>t&&t.toMillis?t.toMillis():0;
+  const mvC=window._mvC.filter(x=>!cajaDesde||ms_(x.creado)>=cajaDesde),mvR=window._mvR.filter(x=>!cajaDesde||ms_(x.creado)>=cajaDesde);
   const sum=l=>l.reduce((a,x)=>a+Math.abs(x.monto||0),0);
-  const real=terms.filter(x=>!x.prueba);
+  const real=terms.filter(x=>!x.prueba&&(!cajaDesde||ms_(x.creada)>=cajaDesde));
   const prem=x=>(x.ganQuintina?x.ganQuintina.premio||0:0)+(x.ganBingo?x.ganBingo.premio||0:0);
   const com=x=>Math.max(0,(x.pozo||0)-prem(x));
   const totCom=real.reduce((a,x)=>a+com(x),0),totPozo=real.reduce((a,x)=>a+(x.pozo||0),0);
@@ -63,10 +65,10 @@ function rankEl(){
   const l=orden(rk).slice(0,10);
   el.innerHTML=l.length?l.map((x,i)=>`<div class="mv"><b>${i+1}º ${esc(x.name||'?')}</b><span>${x.ganadas||0} ganadas · ${x.jugadas} jugadas · ${x.perd} perdidas · ${x.pct}%</span></div>`).join(''):'<p class="note">Todavía no hay partidas contadas.</p>';
 }
-let U=null,me=null,cfg={precioCarton:500,comision:0,pctQuintina:30,pctBingo:70,segBola:6,segInicio:15,whatsapp:''},us=[],ms=[],q='',err='',ok='',unsubs=[],sl={},slOk=false,rk=[],mvC=[],mvR=[],terms=[];
+let U=null,me=null,cfg={precioCarton:500,comision:0,pctQuintina:30,pctBingo:70,segBola:6,segInicio:15,whatsapp:''},us=[],ms=[],q='',err='',ok='',unsubs=[],sl={},slOk=false,rk=[],mvC=[],mvR=[],terms=[],cajaDesde=0;window._mvC=[];window._mvR=[];
 
 onAuthStateChanged(auth,u=>{
-  unsubs.forEach(f=>f());unsubs=[];U=u;me=null;us=[];ms=[];sl={};slOk=false;rk=[];mvC=[];mvR=[];terms=[];
+  unsubs.forEach(f=>f());unsubs=[];U=u;me=null;us=[];ms=[];sl={};slOk=false;rk=[];mvC=[];mvR=[];terms=[];cajaDesde=0;window._mvC=[];window._mvR=[];
   if(u){
     unsubs.push(onSnapshot(doc(db,'users',u.uid),s=>{
       const was=me&&me.admin;me=s.exists()?s.data():null;
@@ -78,8 +80,9 @@ onAuthStateChanged(auth,u=>{
         unsubs.push(onSnapshot(collection(db,'salas'),s=>{sl={};s.docs.forEach(d=>{sl[d.id]=d.data()});if(!slOk){slOk=true;view()}}));
         unsubs.push(onSnapshot(query(collection(db,'stats'),orderBy('ganadas','desc'),limit(100)),s=>{rk=s.docs.map(d=>({id:d.id,...d.data()}));rankEl()}));
         // Registro de caja: acreditaciones, débitos y partidas terminadas (para la comisión)
-        unsubs.push(onSnapshot(query(collection(db,'movimientos'),where('tipo','==','carga')),s=>{mvC=s.docs.map(d=>({id:d.id,...d.data({serverTimestamps:'estimate'})}));cajaEl()}));
-        unsubs.push(onSnapshot(query(collection(db,'movimientos'),where('tipo','==','retiro')),s=>{mvR=s.docs.map(d=>({id:d.id,...d.data({serverTimestamps:'estimate'})}));cajaEl()}));
+        unsubs.push(onSnapshot(doc(db,'config','caja'),s=>{const d=s.exists()?s.data().desde:null;cajaDesde=d&&d.toMillis?d.toMillis():0;cajaEl()}));
+        unsubs.push(onSnapshot(query(collection(db,'movimientos'),where('tipo','==','carga')),s=>{mvC=s.docs.map(d=>({id:d.id,...d.data({serverTimestamps:'estimate'})}));window._mvC=mvC;cajaEl()}));
+        unsubs.push(onSnapshot(query(collection(db,'movimientos'),where('tipo','==','retiro')),s=>{mvR=s.docs.map(d=>({id:d.id,...d.data({serverTimestamps:'estimate'})}));window._mvR=mvR;cajaEl()}));
         unsubs.push(onSnapshot(query(collection(db,'mesas'),where('estado','==','terminada')),s=>{terms=s.docs.map(d=>({id:d.id,...d.data()}));cajaEl()}));
       }
       view();
@@ -110,6 +113,7 @@ function view(){
     <p class="note">Sin saldo y sin esperar rivales: cada usuario juega solo. No cuenta para el ranking. Los cambios de máximo y premios se aplican a la mesa siguiente a la que está esperando ahora.</p>
     ${err?`<div class="err">${err}</div>`:''}${ok?`<div class="okm">${ok}</div>`:''}
     <button class="b1">Guardar mesas fijas</button></form>
+  <div class="card"><h2>Cancelar torneo</h2><p class="note">Cancela el torneo que está esperando jugadores: les devuelve la inscripción a sus saldos, borra la mesa y quita la fecha. Después podés programar otro torneo arriba.</p><button class="b2" data-a="cantor">❌ Cancelar torneo y devolver inscripciones</button></div>
   <form class="card" id="cf"><h2>Configuración</h2>
     <label>Precio del cartón (en pesos)<input name="pre" type="number" min="1" step="1" value="${cfg.precioCarton}"></label>
     <label>Premio QUINTINA (% del pozo)<input name="pq" type="number" min="0" max="100" step="1" value="${cfg.pctQuintina}"></label>
@@ -121,10 +125,10 @@ function view(){
     <p class="note">En mesas "solo Bingo", el Bingo cobra la suma de Quintina + Bingo.</p>
     ${err?`<div class="err">${err}</div>`:''}${ok?`<div class="okm">${ok}</div>`:''}
     <button class="b1">Guardar configuración</button></form>
-  <div class="card"><h2>📒 Registro de caja</h2><div id="caja"></div></div>
+  <div class="card"><h2>📒 Registro de caja</h2><div id="caja"></div><button class="b2" data-a="cajadel">🗑️ Borrar registro de caja y movimientos</button><p class="note">Pone los totales y la lista en cero desde ahora. No cambia los saldos ni el historial que ve cada jugador.</p></div>
   <div class="card"><h2>🏆 Ranking</h2><p class="note">Mejores jugadores por partidas ganadas (Quintina o Bingo). Solo cuentan partidas con dinero.</p><div id="rk"></div>
     <label>Cantidad de jugadores en la imagen<select id="rkn"><option value="10">Top 10</option><option value="15">Top 15</option><option value="20">Top 20</option></select></label>
-    <button class="b1" data-a="png">📥 Descargar ranking (PNG)</button><p class="note">Se guarda como imagen en tu teléfono, lista para subir al grupo de WhatsApp.</p></div>
+    <button class="b1" data-a="png">📥 Descargar ranking (PNG)</button><p class="note">Se guarda como imagen en tu teléfono, lista para subir al grupo de WhatsApp.</p><button class="b2" data-a="rkdel">🗑️ Borrar datos del ranking</button><p class="note">Deja el ranking en cero para todos los jugadores.</p></div>
   <div class="card"><h2>Jugadores</h2><div class="note" id="cont"></div><input id="q" placeholder="Buscar por nombre o código" value="${esc(q)}" aria-label="Buscar jugador"><div id="lista"></div></div>
   <div class="card"><div class="row"><h2>Últimas mesas y resultados</h2><button class="b2" data-a="hist">🗑️ Eliminar historial</button></div><p class="note">El pozo se muestra con la comisión ya descontada.</p><div id="ms"></div></div>`;
   lista();extras();rankEl();cajaEl();
@@ -211,6 +215,51 @@ document.addEventListener('submit',async e=>{
 document.addEventListener('click',async e=>{
   const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a;
   if(a==='salir')return signOut(auth);
+  if(a==='rkdel'){
+    if(!confirm('Se borran las estadísticas de TODOS los jugadores (jugadas, ganadas y perdidas) y el ranking vuelve a cero. No se puede deshacer. ¿Seguro?'))return;
+    b.disabled=true;
+    try{
+      const snap=await getDocs(collection(db,'stats'));
+      for(let i=0;i<snap.docs.length;i+=400){const w=writeBatch(db);snap.docs.slice(i,i+400).forEach(d=>w.delete(d.ref));await w.commit()}
+      await setDoc(doc(db,'config','ranking'),{desde:serverTimestamp()});
+      alert('Ranking borrado.');
+    }catch(x){alert('No se pudo borrar el ranking.')}
+    b.disabled=false;return;
+  }
+  if(a==='cajadel'){
+    if(!confirm('Se borra el registro de caja: totales acreditado, debitado y comisión, y la lista de últimos movimientos. Los saldos y el historial de cada jugador NO cambian. No se puede deshacer. ¿Seguro?'))return;
+    b.disabled=true;
+    try{await setDoc(doc(db,'config','caja'),{desde:serverTimestamp()});alert('Registro de caja borrado.')}catch(x){alert('No se pudo borrar el registro.')}
+    b.disabled=false;return;
+  }
+  if(a==='cantor'){
+    b.disabled=true;
+    try{
+      const snap=await getDocs(query(collection(db,'mesas'),where('sala','==','torneo'),where('estado','==','esperando')));
+      const items=[];let tot=0,cant=0;
+      for(const d of snap.docs){
+        const x=d.data(),js=await getDocs(collection(db,'mesas',d.id,'jugadores'));
+        const ju=js.docs.map(j=>{const c=(j.data().cartones||[]).length*(x.precio||0);tot+=c;cant++;return{j,c}});
+        items.push({d,ju});
+      }
+      const msg=cant?'Se cancela el torneo. Se devuelven '+cant+(cant===1?' inscripción':' inscripciones')+' por un total de '+fmt(tot)+' y se quita la fecha. ¿Seguro?':'No hay inscriptos. Se quita la fecha del torneo. ¿Seguro?';
+      if(!confirm(msg)){b.disabled=false;return}
+      for(const it of items){
+        const w=writeBatch(db);
+        it.ju.forEach(({j,c})=>{
+          if(c>0&&us.find(u=>u.id===j.id)){
+            w.update(doc(db,'users',j.id),{saldo:increment(c)});
+            w.set(doc(collection(db,'movimientos')),{uid:j.id,tipo:'devolucion',monto:c,detalle:'Torneo cancelado · devolución de inscripción',por:me.name,creado:serverTimestamp()});
+          }
+          w.delete(j.ref);
+        });
+        w.delete(it.d.ref);await w.commit();
+      }
+      await setDoc(doc(db,'salas','torneo'),{fecha:null},{merge:true});
+      alert('Torneo cancelado.');
+    }catch(x){alert('No se pudo cancelar el torneo.')}
+    b.disabled=false;return;
+  }
   if(a==='png'){
     b.disabled=true;
     try{await bajarPng(+document.getElementById('rkn').value||10)}catch(x){alert('No se pudo crear la imagen.')}

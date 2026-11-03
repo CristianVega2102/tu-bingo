@@ -149,7 +149,7 @@ function sonar(n,extra=0){
 
 /* ---------- Estado ---------- */
 let elim=false,U=null,me=null,cfg={precioCarton:500,comision:0,pctQuintina:30,pctBingo:70,segBola:6,segInicio:15,whatsapp:''};
-let abiertas=[],mias=[],hosted=[],movs=[],act=null,jug=null,unsubs=[],unJug=null,unJugKey='',salas={},ranking=[],miStat=null,contando=false;
+let abiertas=[],mias=[],hosted=[],movs=[],act=null,jug=null,unsubs=[],unJug=null,unJugKey='',salas={},ranking=[],miStat=null,contando=false,rkDesde=0,rkListo=false;
 let pin=null,tab='inicio',modo='in',msg=null,busy=false,online=navigator.onLine,pS=null,MK={};
 const pref={prem:'ambos',cupo:'10',n:'1',tipo:'real'};
 const MSG={'mesa-cerrada':'La mesa ya empezó o cambió.','mesa-llena':'La mesa se llenó.','sin-saldo':'Saldo insuficiente.','auth/email-already-in-use':'Ese correo ya tiene una cuenta. Probá entrar.','auth/invalid-credential':'Correo o contraseña incorrectos.','auth/weak-password':'La contraseña necesita al menos 6 caracteres.','auth/invalid-email':'Escribí un correo válido.','sala-no-disponible':'La mesa no está disponible ahora. Probá de nuevo en unos segundos.','torneo-cerrado':'La inscripción al torneo está cerrada.','permission-denied':'El servidor no aceptó la operación. Revisá tu saldo y que la mesa siga abierta.'};
@@ -161,7 +161,7 @@ let voz=lsGet('tb_voz')!=='0',auto=lsGet('tb_auto')==='1';const abiertos=new Set
 
 onAuthStateChanged(auth,u=>{
   unsubs.forEach(f=>f());unsubs=[];if(unJug)unJug();unJug=null;unJugKey='';
-  U=u;me=null;elim=false;abiertas=[];mias=[];hosted=[];movs=[];act=null;jug=null;pS=null;MK={};salas={};ranking=[];miStat=null;
+  U=u;me=null;elim=false;abiertas=[];mias=[];hosted=[];movs=[];act=null;jug=null;pS=null;MK={};salas={};ranking=[];miStat=null;rkDesde=0;rkListo=false;
   if(u){
     const lista=(q,fn)=>unsubs.push(onSnapshot(q,s=>{fn(s.docs.map(d=>({id:d.id,...d.data({serverTimestamps:'estimate'})})));refrescar()}));
     unsubs.push(onSnapshot(doc(db,'users',u.uid),s=>{me=s.exists()?s.data():null;view()}));
@@ -172,6 +172,7 @@ onAuthStateChanged(auth,u=>{
     lista(query(collection(db,'mesas'),where('participantes','array-contains',u.uid)),l=>mias=l);
     unsubs.push(onSnapshot(collection(db,'salas'),s=>{salas={};s.docs.forEach(d=>{salas[d.id]=d.data({serverTimestamps:'estimate'})});view()}));
     unsubs.push(onSnapshot(query(collection(db,'stats'),orderBy('ganadas','desc'),limit(50)),s=>{ranking=s.docs.map(d=>({id:d.id,...d.data()}));view()}));
+    unsubs.push(onSnapshot(doc(db,'config','ranking'),s=>{const d=s.exists()?s.data().desde:null;rkDesde=d&&d.toMillis?d.toMillis():0;rkListo=true;contar()}));
     unsubs.push(onSnapshot(doc(db,'stats',u.uid),s=>{miStat=s.exists()?s.data():null;view()}));
   }
   view();
@@ -361,7 +362,7 @@ function cuentaTorneo(){
 }
 function unirseCtl(s,m){
   const c=salaCfg(s),pr=s==='prueba'?0:c.precio,lleno=!!m&&m.participantes.length>=c.cupo,cierra=s==='torneo'&&!(c.fecha>Date.now()),sin=me.saldo<(+pref.n)*pr;
-  const txt=sin?'Saldo insuficiente':lleno?'Mesa llena':cierra?'Inscripción cerrada':s==='prueba'?'Empezar práctica':s==='torneo'?'Inscribirme':'Sentarme';
+  const txt=sin?'Saldo insuficiente':lleno?'Mesa llena':cierra?'Inscripción cerrada':s==='prueba'?'Empezar práctica':s==='torneo'?'Inscribirme':'Jugar';
   return `<select data-pref="n" aria-label="Cantidad de cartones">${[1,2,3,4,5,6].map(i=>`<option value="${i}" ${pref.n==i?'selected':''}>${i} ${i===1?'cartón':'cartones'} · ${s==='prueba'?'gratis':fmt(i*pr)}</option>`).join('')}</select>
   <button class="b1" data-a="unirse" data-sala="${s}" data-id="${m?m.id:''}" ${busy||lleno||sin||cierra?'disabled':''}>${txt}</button>`;
 }
@@ -448,11 +449,13 @@ function rankingView(){
 }
 // Suma al ranking cada partida terminada (una sola vez por partida; las reglas de Firebase lo verifican)
 async function contar(){
-  if(contando||!U||!me)return;contando=true;
+  if(contando||!U||!me||!rkListo)return;contando=true;
   try{
     for(const m of mias){
       const k='tb_st_'+m.id+'_'+U.uid;
       if(m.estado!=='terminada'||m.prueba||lsGet(k))continue;
+      const cm=m.creada&&m.creada.toMillis?m.creada.toMillis():0;
+      if(cm&&cm<rkDesde){lsSet(k,'1');continue}
       try{
         const sref=doc(db,'stats',U.uid),sd=await getDoc(sref),p=sd.exists()?sd.data():{jugadas:0,ganadas:0,bingos:0,quintinas:0};
         const b=m.ganBingo&&m.ganBingo.uid===U.uid?1:0,q=m.ganQuintina&&m.ganQuintina.uid===U.uid?1:0;
