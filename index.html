@@ -564,24 +564,26 @@ async function accion(a,b){
     }
     tab='inicio';
   }
-    if(a==='salirMesa'){
+      if(a==='salirMesa'){
     const m=act, sala=m.sala||'principal';
-    if(sala==='torneo'){
-      // En el torneo solo sale de la vista actual, pero queda inscripto y no se borran sus datos ni se devuelve saldo
-      pin = null;
-      msg = {t:'ok', x:'Saliste de la vista del torneo, pero ya estás inscripto. Podés seguir jugando otras partidas.'};
-      return view();
-    }
     
-    // Comportamiento normal para mesas principales / práctica
+    if(sala==='torneo'){
+      pin = null; // Limpiamos el pin fijo para que la app vuelva a mostrar la pantalla de inicio normal
+      msg = {t:'ok', x:'Saliste de la vista del torneo, pero ya estás inscripto. Ya podés jugar en las demás mesas.'};
+      return refrescar(); // Recargamos las vistas y mesas disponibles
+    }
+
+    // Comportamiento normal para la mesa principal o práctica
     const n=jug?jug.cartones.length:0,costo=n*m.precio,quedan=m.participantes.length-1;
     const w=writeBatch(db);
     w.delete(doc(db,'mesas',m.id,'jugadores',u));
-    w.update(doc(db,'mesas',m.id),{participantes:arrayRemove(u),pozo:increment(-costo),ncart:increment(-n),llenaEn:(m.sala==='principal'&&quedan>=2)?serverTimestamp():null});
+    w.update(doc(db,'mesas',m.id),{participantes:arrayRemove(u),pozo:increment(-costo),ncart:increment(-n),llenaEn:(sala==='principal'&&quedan>=2)?serverTimestamp():null});
     if(!m.prueba)w.update(uref,{saldo:increment(costo),mesaSalida:m.id,tipoCobro:null});
     if(!m.prueba)w.set(doc(collection(db,'movimientos')),{uid:u,tipo:'devolucion',monto:costo,detalle:m.nombre,creado:serverTimestamp()});
     await w.commit();
     if(m.prueba){try{await deleteDoc(doc(db,'mesas',m.id))}catch(e){}}
+    pin = null;
+    return refrescar();
   }
   if(a==='aband'){
     const ref=doc(db,'mesas',act.id);let fin=false,gano=false;
