@@ -373,7 +373,7 @@ function cuentaProg(m){
   return (h?h+' h ':'')+mi+' min '+se+' s';
 }
 function unirseCtl(s,m,rev){
-  const c=salaCfg(s),pr=s==='prueba'?0:c.precio,lleno=!!m&&m.participantes.length>=c.cupo,cierra=s==='principal'&&(cerradaHoy()||!m||!(inicioDe(m)>Date.now())),sin=me.saldo<(+pref.n)*pr;
+  const c=salaCfg(s),pr=s==='prueba'?0:(m&&m.precio!=null?m.precio:c.precio),lleno=!!m&&m.participantes.length>=c.cupo,cierra=s==='principal'&&(cerradaHoy()||!m||!(inicioDe(m)>Date.now())),sin=me.saldo<(+pref.n)*pr;
   const txt=sin?'Saldo insuficiente':lleno?'Mesa llena':cierra?'Inscripción cerrada':s==='prueba'?'Empezar práctica':rev?'🔁 Revancha':'Inscribirme';
   return `<select data-pref="n" aria-label="Cantidad de cartones">${[1,2,3,4,5,6].map(i=>`<option value="${i}" ${pref.n==i?'selected':''}>${i} ${i===1?'cartón':'cartones'} · ${s==='prueba'?'gratis':fmt(i*pr)}</option>`).join('')}</select>
   <button class="b1" data-a="unirse" data-sala="${s}" data-id="${m?m.id:''}" ${busy||lleno||sin||cierra?'disabled':''}>${txt}</button>`;
@@ -386,7 +386,7 @@ function salasHTML(){
   else cuerpo=`<p><b class="gold">Empieza a las ${esc(horaTxt(ini))}</b></p><p class="note">Faltan <b id="cdt">${cuentaProg(mp)}</b>. Empieza sola a esa hora si hay al menos 2 inscriptos; si no, se reprograma ${minEsp()} minutos más tarde y quedás anotado. Podés salir antes y te devolvemos el saldo.</p>${mp.participantes.includes(U.uid)?`<div class="msg ok">✅ Ya estás inscripto en esta partida.</div><button class="b3" data-a="ver" data-id="${mp.id}">Ver mi mesa</button>`:unirseCtl('principal',mp)}`;
   return `<h2>Mesas</h2>
   <div class="card"><div class="row"><h2>🎱 Mesa principal</h2><span class="chip">${np}/${P.cupo}</span></div>
-    <p class="note">${P.premios==='ambos'?'Quintina y Bingo':'Solo Bingo'} · Cartón ${fmt(P.precio)} · Pozo ${fmt(mp?pozoNeto(mp):0)}</p>
+    <p class="note">${P.premios==='ambos'?'Quintina y Bingo':'Solo Bingo'} · Cartón ${fmt(mp&&mp.precio!=null?mp.precio:P.precio)} · Pozo ${fmt(mp?pozoNeto(mp):0)}</p>
     ${cuerpo}</div>
   ${X.activa?`<div class="card"><h2>🎓 Mesa de práctica</h2><p class="note">Jugá gratis, solo y sin esperar rivales. No usa saldo ni reparte premios, ni cuenta para el ranking.</p>${unirseCtl('prueba',null)}</div>`:''}`;
 }
@@ -791,6 +791,8 @@ async function mantener(){
   try{
     const mp=mesaSala('principal');
     if(!mp){await asegurarSala('principal');return}
+    // Si el administrador cambió el precio, una mesa vacía con el precio viejo se reemplaza por una nueva
+    if(me.admin&&mp.precio!==cfg.precioCarton&&mp.participantes.length===0){await deleteDoc(doc(db,'mesas',mp.id));return}
     if(cerradaHoy())return;
     const ref=doc(db,'mesas',mp.id);
     if(!inicioDe(mp)){
