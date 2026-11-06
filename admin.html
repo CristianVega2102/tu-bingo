@@ -284,9 +284,19 @@ document.addEventListener('click',async e=>{
       sl.principal={...(sl.principal||{}),programadaPara:{toMillis:()=>f.getTime()},cerradaHasta:null};
       const pe=Timestamp.fromMillis(f.getTime()-Math.max(1,+cfg.minEspera||15)*60000);
       const snap=await getDocs(query(collection(db,'mesas'),where('sala','==','principal'),where('estado','==','esperando')));
-      for(const d of snap.docs)await updateDoc(d.ref,{progEn:pe});
+      let hechas=0;
+      for(const d of snap.docs){await updateDoc(d.ref,{progEn:pe});hechas++}
+      if(!hechas){
+        // No había mesa esperando: la crea el administrador y le fija el horario
+        const sc=sl.principal||{},nref=doc(collection(db,'mesas')),wb=writeBatch(db);
+        wb.set(nref,{nombre:'Mesa principal',sala:'principal',anfitrion:U.uid,anfitrionNombre:me.name,premios:sc.premios||'ambos',cupo:sc.cupo||30,precio:cfg.precioCarton,estado:'esperando',participantes:[],nombres:{},pozo:0,ncart:0,sorteadas:[],abandonaron:[],llenaEn:null,progEn:null,previa:null,origen:null,ultimaBola:serverTimestamp(),ganQuintina:null,ganBingo:null,creada:serverTimestamp()});
+        wb.set(doc(db,'salas','principal'),{actual:nref.id},{merge:true});
+        await wb.commit();
+        await updateDoc(nref,{progEn:pe});
+      }
       reab='';view();
-    }catch(x){alert('No se pudo programar la mesa. Probá de nuevo.');b.disabled=false}
+      alert('Listo: la mesa quedó programada y ya se pueden anotar.');
+    }catch(x){alert('No se pudo programar la mesa ('+(x&&(x.code||x.message)||x)+'). Si dice permission-denied, falta publicar las reglas nuevas de Firebase.');b.disabled=false}
     return;
   }
   if(a==='desprog'){
