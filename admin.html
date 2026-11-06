@@ -23,6 +23,9 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 .err{color:var(--bad);font-size:13px;font-weight:800}.okm{color:var(--ok);font-size:13px;font-weight:800}
 .u{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:8px}
 .mv{border-top:1px solid var(--line);padding-top:8px;font-size:13px;display:flex;flex-direction:column;gap:2px}
+.scr{max-height:min(380px,58dvh);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:rgba(0,0,0,.18)}
+.scr>:first-child{border-top:0;padding-top:0}
+.scr::-webkit-scrollbar{width:6px}.scr::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px}
 </style>
 </head>
 <body>
@@ -57,8 +60,8 @@ function cajaEl(){
   <div class="mv"><span>💸 Total debitado / retirado (${mvR.length})</span><b class="mono" style="color:var(--bad);font-size:22px">${fmt(sum(mvR))}</b></div>
   <div class="mv"><span>🏦 Comisión total de la casa (${real.length} partidas terminadas)</span><b class="mono gold" style="font-size:22px">${fmt(totCom)}</b><span class="note">Pozo total ${fmt(totPozo)} menos premios entregados. Si borrás el historial de mesas, esas partidas dejan de sumar acá.</span></div>
   <h2 style="margin-top:10px">Últimos movimientos</h2>
-  ${mov.length?mov.slice(0,40).map(x=>`<div class="mv"><b style="color:var(--${x.k==='c'?'ok':'bad'})">${x.k==='c'?'＋ Acreditado':'− Debitado'} ${fmt(Math.abs(x.monto||0))}</b><span>${esc(nom(x.uid))} · ${esc(fh(x.creado))}</span><span class="note">${esc(x.detalle||'')}${x.por?' · por '+esc(x.por):''}</span></div>`).join(''):'<p class="note">Todavía no hay movimientos registrados.</p>'}
-  ${real.length?`<h2 style="margin-top:10px">Comisión por partida</h2>`+real.slice().sort((a,b)=>(b.creada&&b.creada.toMillis?b.creada.toMillis():0)-(a.creada&&a.creada.toMillis?a.creada.toMillis():0)).slice(0,15).map(x=>`<div class="mv"><b>${esc(x.nombre)} · ${esc(fh(x.creada))}</b><span>Pozo ${fmt(x.pozo||0)} · Premios ${fmt(prem(x))} · <b class="gold">Comisión ${fmt(com(x))}</b></span></div>`).join(''):''}`;
+  ${mov.length?'<div class="scr">'+mov.slice(0,40).map(x=>`<div class="mv"><b style="color:var(--${x.k==='c'?'ok':'bad'})">${x.k==='c'?'＋ Acreditado':'− Debitado'} ${fmt(Math.abs(x.monto||0))}</b><span>${esc(nom(x.uid))} · ${esc(fh(x.creado))}</span><span class="note">${esc(x.detalle||'')}${x.por?' · por '+esc(x.por):''}</span></div>`).join('')+'</div>':'<p class="note">Todavía no hay movimientos registrados.</p>'}
+  ${real.length?`<h2 style="margin-top:10px">Comisión por partida</h2>`+'<div class="scr">'+real.slice().sort((a,b)=>(b.creada&&b.creada.toMillis?b.creada.toMillis():0)-(a.creada&&a.creada.toMillis?a.creada.toMillis():0)).slice(0,15).map(x=>`<div class="mv"><b>${esc(x.nombre)} · ${esc(fh(x.creada))}</b><span>Pozo ${fmt(x.pozo||0)} · Premios ${fmt(prem(x))} · <b class="gold">Comisión ${fmt(com(x))}</b></span></div>`).join('')+'</div>':''}`;
 }
 function rankEl(){
   const el=document.getElementById('rk');if(!el)return;
@@ -122,11 +125,11 @@ function view(){
     ${err?`<div class="err">${err}</div>`:''}${ok?`<div class="okm">${ok}</div>`:''}
     <button class="b1">Guardar configuración</button></form>
   <div class="card"><h2>📒 Registro de caja</h2><div id="caja"></div><button class="b2" data-a="cajadel">🗑️ Borrar registro de caja y movimientos</button><p class="note">Pone los totales y la lista en cero desde ahora. No cambia los saldos ni el historial que ve cada jugador.</p></div>
-  <div class="card"><h2>🏆 Ranking</h2><p class="note">Mejores jugadores por partidas ganadas (Quintina o Bingo). Solo cuentan partidas con dinero.</p><div id="rk"></div>
+  <div class="card"><h2>🏆 Ranking</h2><p class="note">Mejores jugadores por partidas ganadas (Quintina o Bingo). Solo cuentan partidas con dinero.</p><div id="rk" class="scr"></div>
     <label>Cantidad de jugadores en la imagen<select id="rkn"><option value="10">Top 10</option><option value="15">Top 15</option><option value="20">Top 20</option></select></label>
     <button class="b1" data-a="png">📥 Descargar ranking (PNG)</button><p class="note">Se guarda como imagen en tu teléfono, lista para subir al grupo de WhatsApp.</p><button class="b2" data-a="rkdel">🗑️ Borrar datos del ranking</button><p class="note">Deja el ranking en cero para todos los jugadores.</p></div>
-  <div class="card"><h2>Jugadores</h2><div class="note" id="cont"></div><input id="q" placeholder="Buscar por nombre o código" value="${esc(q)}" aria-label="Buscar jugador"><div id="lista"></div></div>
-  <div class="card"><div class="row"><h2>Últimas mesas y resultados</h2><button class="b2" data-a="hist">🗑️ Eliminar historial</button></div><p class="note">El pozo se muestra con la comisión ya descontada.</p><div id="ms"></div></div>`;
+  <div class="card"><h2>Jugadores</h2><div class="note" id="cont"></div><input id="q" placeholder="Buscar por nombre o código" value="${esc(q)}" aria-label="Buscar jugador"><div id="lista" class="scr"></div></div>
+  <div class="card"><div class="row"><h2>Últimas mesas y resultados</h2><button class="b2" data-a="hist">🗑️ Eliminar historial</button></div><p class="note">El pozo se muestra con la comisión ya descontada.</p><div id="ms" class="scr"></div></div>`;
   lista();extras();rankEl();cajaEl();
 }
 function lista(){
