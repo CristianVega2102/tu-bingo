@@ -374,7 +374,7 @@ function finPanel(m){
 }
 function revanchaHTML(){
   const mp=mesaSala('principal');
-  if(cerradaHoy())return '<p class="note">🔒 La mesa principal está cerrada por hoy.</p>';
+  if(cerradaHoy())return `<p class="note">🔒 La mesa principal está cerrada. ${reabreTxt()}</p>`;
   if(!mp||!inicioDe(mp))return '<p class="note">🔁 Preparando la revancha…</p>';
   if(mp.participantes.includes(U.uid))return `<div class="msg ok">✅ Ya estás anotado en la revancha (${esc(horaTxt(inicioDe(mp)))}).</div>`;
   return `<div class="det"><span>🔁 Revancha</span><b>${esc(horaTxt(inicioDe(mp)))}</b></div>${unirseCtl('principal',mp,true)}`;
@@ -395,6 +395,7 @@ const minEsp=()=>Math.max(1,+cfg.minEspera||15);
 // Hora de inicio de una mesa principal: se programó (progEn) y empieza minEsp() minutos después
 const inicioDe=m=>m&&m.progEn&&m.progEn.toMillis?m.progEn.toMillis()+minEsp()*60000:0;
 const cerradaHoy=()=>salaCfg('principal').cerradaHasta>Date.now();
+const reabreTxt=()=>{const ms=salaCfg('principal').cerradaHasta;return ms>=4e12?'Se reabrirá cuando el administrador lo indique.':'Se reabre el '+new Date(ms).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})+' hs.'};
 const horaTxt=ms=>new Date(ms).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})+' hs';
 const mesaSala=s=>{const a=salas[s]&&salas[s].actual;return a?(abiertas.find(x=>x.id===a&&x.estado==='esperando')||null):null};
 function cuentaProg(m){
@@ -412,7 +413,7 @@ function salasHTML(){
   const P=salaCfg('principal'),X=salaCfg('prueba'),mp=mesaSala('principal'),np=mp?mp.participantes.length:0,ini=inicioDe(mp),cerr=cerradaHoy();
   const precio=mp&&mp.precio!=null?mp.precio:P.precio,listo=!cerr&&mp&&ini;
   let cuerpo;
-  if(cerr)cuerpo=`<p class="lbsub">🔒 La mesa principal está cerrada por hoy. Vuelve a abrir mañana.</p>`;
+  if(cerr)cuerpo=`<p class="lbsub">🔒 La mesa principal está cerrada. ${reabreTxt()}</p>`;
   else if(!mp||!ini)cuerpo=`<p class="lbsub">La próxima partida se programa cuando termine la que está en juego.</p>`;
   else cuerpo=`<div class="lbinfo"><span>🕒 <b>${esc(horaTxt(ini))}</b></span><span>⏳ Faltan <b id="cdt">${cuentaProg(mp)}</b></span></div>
     ${mp.participantes.includes(U.uid)?`<div class="msg ok">✅ Ya estás inscripto en esta partida.</div><button class="b3" data-a="ver" data-id="${mp.id}">Ver mi mesa</button>`:`<div class="lbctl">${unirseCtl('principal',mp,false,'bgold')}</div>`}`;

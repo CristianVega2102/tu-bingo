@@ -70,6 +70,9 @@ function rankEl(){
 }
 let U=null,me=null,cfg={precioCarton:500,comision:0,pctQuintina:30,pctBingo:70,segBola:6,minEspera:15,whatsapp:''},us=[],ms=[],q='',err='',ok='',unsubs=[],sl={},slOk=false,rk=[],mvC=[],mvR=[],terms=[],cajaDesde=0;window._mvC=[];window._mvR=[];
 
+let reab='';
+const fcerr=ms=>ms>=4e12?'hasta que la reabras vos':'hasta el '+new Date(ms).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})+' hs';
+document.addEventListener('input',e=>{if(e.target&&e.target.id==='reab')reab=e.target.value});
 onAuthStateChanged(auth,u=>{
   unsubs.forEach(f=>f());unsubs=[];U=u;me=null;us=[];ms=[];sl={};slOk=false;rk=[];mvC=[];mvR=[];terms=[];cajaDesde=0;window._mvC=[];window._mvR=[];
   if(u){
@@ -99,6 +102,7 @@ function view(){
   if(!me)return A.innerHTML='<p class="note">Cargando…</p>';
   if(!me.admin)return A.innerHTML='<h1>Sin permiso</h1><p class="note">Esta cuenta no es de administrador.</p><button class="b2" data-a="salir">Salir</button>';
   const cerr=!!(sl.principal&&sl.principal.cerradaHasta&&sl.principal.cerradaHasta.toMillis&&sl.principal.cerradaHasta.toMillis()>Date.now());
+  const cerrMs=cerr?sl.principal.cerradaHasta.toMillis():0;
   A.innerHTML=`<div class="row"><h1>TU <b>BINGO</b> · Admin</h1><button class="b3" data-a="salir">Salir</button></div>
   <div class="card"><h2>Mesas fijas</h2><p class="note">Hay una mesa principal programada y una mesa de práctica opcional. La principal se programa sola: cuando termina una partida, la siguiente queda anotada a los minutos que fijes abajo; si a la hora no hay 2 inscriptos, se reprograma. Esto se mantiene mientras haya jugadores o administradores con la app abierta. Las bolillas salen solas con el ritmo que fijes abajo.</p><a class="b1" style="text-align:center;text-decoration:none;border-radius:12px;padding:12px;font-family:var(--f);font-weight:600" href="index.html">Ir a la app</a></div>
   <form class="card" id="sf"><h2>Configurar mesas fijas</h2>
@@ -111,7 +115,7 @@ function view(){
     <p class="note">Sin saldo y sin esperar rivales: cada usuario juega solo. No cuenta para el ranking.</p>
     ${err?`<div class="err">${err}</div>`:''}${ok?`<div class="okm">${ok}</div>`:''}
     <button class="b1">Guardar mesas fijas</button></form>
-  <div class="card"><h2>🔒 Mesa principal: cerrar por hoy</h2>${cerr?`<p class="err">La mesa principal está CERRADA hasta el fin de hoy.</p><button class="b1" data-a="abrir">🔓 Reabrir la mesa principal</button>`:`<p class="note">Cierra la mesa principal hasta el final de hoy: devuelve las inscripciones a los saldos, no se programan más partidas y nadie puede anotarse. Una partida que ya está en juego sigue hasta terminar. Mañana se reabre sola, o antes si la reabrís acá.</p><button class="b2" data-a="cerrar">🔒 Cerrar mesa principal por hoy</button>`}</div>
+  <div class="card"><h2>🔒 Mesa principal: cerrar</h2>${cerr?`<p class="err">La mesa principal está CERRADA ${esc(fcerr(cerrMs))}.</p><button class="b1" data-a="abrir">🔓 Reabrir la mesa principal ahora</button><label>Cambiar fecha y hora de reapertura<input type="datetime-local" id="reab" value="${esc(reab)}"></label><button class="b2" data-a="reabfecha">📅 Guardar nueva fecha</button>`:`<p class="note">Cierra la mesa principal: devuelve las inscripciones a los saldos, no se programan más partidas y nadie puede anotarse. Una partida que ya está en juego sigue hasta terminar. Elegí cuándo se reabre; si no ponés fecha, queda cerrada hasta que la reabras vos.</p><label>Se reabre el (opcional)<input type="datetime-local" id="reab" value="${esc(reab)}"></label><button class="b2" data-a="cerrar">🔒 Cerrar mesa principal</button>`}</div>
   <div class="card"><h2>📅 Resultados del día</h2><p class="note">Imagen con todas las partidas terminadas hoy: ganadores de Quintina y Bingo y premios. Lista para subir al grupo.</p><button class="b1" data-a="dia">📥 Descargar resultados del día (PNG)</button></div>
   <form class="card" id="cf"><h2>Configuración</h2>
     <label>Precio del cartón (en pesos)<input name="pre" type="number" min="1" step="1" value="${cfg.precioCarton}"></label>
@@ -269,7 +273,17 @@ document.addEventListener('click',async e=>{
     try{await setDoc(doc(db,'salas','principal'),{cerradaHasta:null},{merge:true});sl.principal={...(sl.principal||{}),cerradaHasta:null};view()}catch(x){alert('No se pudo reabrir la mesa.');b.disabled=false}
     return;
   }
+  if(a==='reabfecha'){
+    const v=(document.getElementById('reab')||{}).value||reab;const f=v?new Date(v):null;
+    if(!f||isNaN(f.getTime())||f.getTime()<=Date.now()){alert('Elegí una fecha y hora futuras para la reapertura.');return}
+    b.disabled=true;
+    try{await setDoc(doc(db,'salas','principal'),{cerradaHasta:f},{merge:true});sl.principal={...(sl.principal||{}),cerradaHasta:{toMillis:()=>f.getTime()}};reab='';view()}catch(x){alert('No se pudo guardar la fecha.');b.disabled=false}
+    return;
+  }
   if(a==='cerrar'){
+    const v0=(document.getElementById('reab')||{}).value||reab;let fin=null;
+    if(v0){fin=new Date(v0);if(isNaN(fin.getTime())||fin.getTime()<=Date.now()){alert('La fecha de reapertura tiene que ser futura.');return}}
+    else fin=new Date('2100-01-01T00:00:00');
     b.disabled=true;
     try{
       const snap=await getDocs(query(collection(db,'mesas'),where('sala','==','principal'),where('estado','==','esperando')));
@@ -279,17 +293,17 @@ document.addEventListener('click',async e=>{
         const ju=js.docs.map(j=>{const c=(j.data().cartones||[]).length*(x.precio||0);tot+=c;cant++;return{j,c}});
         items.push({d,ju});
       }
-      const msg=cant?'Se cierra la mesa principal por hoy. Se devuelven '+cant+(cant===1?' inscripción':' inscripciones')+' por un total de '+fmt(tot)+'. ¿Seguro?':'Se cierra la mesa principal por hoy. No hay inscriptos. ¿Seguro?';
+      const cuando=' Se reabre '+(fin.getFullYear()>=2090?'cuando la reabras vos':'el '+fin.toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})+' hs')+'.';
+      const msg=cant?'Se cierra la mesa principal. Se devuelven '+cant+(cant===1?' inscripción':' inscripciones')+' por un total de '+fmt(tot)+'.'+cuando+' ¿Seguro?':'Se cierra la mesa principal. No hay inscriptos.'+cuando+' ¿Seguro?';
       if(!confirm(msg)){b.disabled=false;return}
-      const fin=new Date();fin.setHours(23,59,59,999);
       await setDoc(doc(db,'salas','principal'),{cerradaHasta:fin},{merge:true});
-      sl.principal={...(sl.principal||{}),cerradaHasta:{toMillis:()=>fin.getTime()}};
+      sl.principal={...(sl.principal||{}),cerradaHasta:{toMillis:()=>fin.getTime()}};reab='';
       for(const it of items){
         const w=writeBatch(db);
         it.ju.forEach(({j,c})=>{
           if(c>0&&us.find(u=>u.id===j.id)){
             w.update(doc(db,'users',j.id),{saldo:increment(c)});
-            w.set(doc(collection(db,'movimientos')),{uid:j.id,tipo:'devolucion',monto:c,detalle:'Mesa principal cerrada por hoy · devolución de inscripción',por:me.name,creado:serverTimestamp()});
+            w.set(doc(collection(db,'movimientos')),{uid:j.id,tipo:'devolucion',monto:c,detalle:'Mesa principal cerrada · devolución de inscripción',por:me.name,creado:serverTimestamp()});
           }
           w.delete(j.ref);
         });
