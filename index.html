@@ -103,22 +103,6 @@ details.card summary{cursor:pointer;font-family:var(--f);font-weight:600;font-si
 .rk{display:grid;grid-template-columns:40px 1fr;gap:2px 8px;align-items:center;border-top:1px solid var(--line);padding:8px 0}
 .rk .pos{grid-row:span 2;font-family:var(--f);font-size:20px;text-align:center}
 .rk.yo{background:#2a2060;border-radius:10px;padding:8px}
-.sala{background:linear-gradient(160deg,#2c2168,#1a1340);border:1.5px solid #4a3aa0;border-radius:24px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.35);display:flex;flex-direction:column;gap:14px}
-.badge{display:inline-block;font-family:var(--f);font-weight:700;font-size:13px;letter-spacing:.6px;padding:6px 12px;border-radius:999px;background:#5b3fd6;color:#fff}.badge.free{background:#0f3b3a;color:#5ef0c0;border:2px solid #2fd3a0}
-.pill{font-family:var(--f);font-weight:600;font-size:14px;padding:6px 12px;border-radius:999px;border:2px solid #2fd37f;background:#0d3328;color:#d9ffe9;display:inline-flex;align-items:center;gap:7px}.pill i{width:10px;height:10px;border-radius:50%;background:#2fe38a}
-.pill.off{border-color:#7a5a10;background:#2a2410;color:#ffe9a0}.pill.off i{background:var(--gold)}.pill.free{border-color:#2fd3a0;background:#0f3b3a;color:#5ef0c0;font-size:24px;font-weight:700;padding:6px 20px}
-.stitle{font-family:var(--f);font-weight:700;font-size:clamp(28px,8vw,34px);line-height:1.05;margin-top:-4px}
-.stats{display:grid;grid-template-columns:1.25fr 1fr 1fr;align-items:center}
-.stats>div{padding:0 10px;text-align:center}.stats>div+div{border-left:2px solid #3a2f7a}.stats>div:first-child{text-align:left;padding-left:0}
-.sbig{font-family:var(--f);font-weight:700;font-size:clamp(34px,10vw,44px);color:var(--gold);line-height:1}.sbig small{font-size:.72em;color:#fff;font-weight:600}
-.slab{color:var(--mute);font-size:14px;margin-top:2px}.sval{font-family:var(--f);font-weight:700;font-size:clamp(20px,6.4vw,30px);line-height:1.1}.sval.g{color:var(--gold)}
-.bar{height:14px;border-radius:999px;background:#2a2060;overflow:hidden}.bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#ffd23d,#f5a91a)}
-.when{background:#2a2060;border-radius:14px;padding:10px 14px;text-align:center;font-size:15px}
-.cta{width:100%;font-size:20px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;border-radius:999px;padding:16px;min-height:58px;box-shadow:0 5px 0 rgba(0,0,0,.28)}
-.cta.g{background:linear-gradient(#ffd84a,#f3b51c);color:#2a1f00}.cta.t{background:linear-gradient(#6df0c0,#2fd9a0);color:#08312a}.cta.o{background:#2a2060;color:var(--ink);border:1.5px solid #4a3aa0}
-.selrow{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:18px;color:var(--mute)}
-.selrow select{width:auto;min-width:150px;border-radius:999px;background:#0e0a24;border:1.5px solid #4a3aa0;font-family:var(--f);font-weight:600;font-size:17px;padding:10px 16px}
-.sep{border-top:2px solid #3a2f7a;padding-top:14px;display:flex;flex-direction:column;gap:14px}
 </style>
 </head>
 <body>
@@ -391,31 +375,20 @@ function cuentaProg(m){
 function unirseCtl(s,m,rev){
   const c=salaCfg(s),pr=s==='prueba'?0:(m&&m.precio!=null?m.precio:c.precio),lleno=!!m&&m.participantes.length>=c.cupo,cierra=s==='principal'&&(cerradaHoy()||!m||!(inicioDe(m)>Date.now())),sin=me.saldo<(+pref.n)*pr;
   const txt=sin?'Saldo insuficiente':lleno?'Mesa llena':cierra?'Inscripción cerrada':s==='prueba'?'Empezar práctica':rev?'🔁 Revancha':'Inscribirme';
-  const ok=!(sin||lleno||cierra);
-  return `<div class="selrow"><span>Cartones</span><select data-pref="n" aria-label="Cantidad de cartones">${[1,2,3,4,5,6].map(i=>`<option value="${i}" ${pref.n==i?'selected':''}>${i} · ${s==='prueba'?'gratis':fmt(i*pr)}</option>`).join('')}</select></div>
-  <button class="cta ${s==='prueba'?'t':'g'}" data-a="unirse" data-sala="${s}" data-id="${m?m.id:''}" ${busy||!ok?'disabled':''}>${txt}${ok?' ›':''}</button>`;
+  return `<select data-pref="n" aria-label="Cantidad de cartones">${[1,2,3,4,5,6].map(i=>`<option value="${i}" ${pref.n==i?'selected':''}>${i} ${i===1?'cartón':'cartones'} · ${s==='prueba'?'gratis':fmt(i*pr)}</option>`).join('')}</select>
+  <button class="b1" data-a="unirse" data-sala="${s}" data-id="${m?m.id:''}" ${busy||lleno||sin||cierra?'disabled':''}>${txt}</button>`;
 }
 function salasHTML(){
   const P=salaCfg('principal'),X=salaCfg('prueba'),mp=mesaSala('principal'),np=mp?mp.participantes.length:0,ini=inicioDe(mp),cerr=cerradaHoy();
-  const abierta=!cerr&&mp&&ini>0,pct=Math.min(100,Math.round(np/(P.cupo||30)*100));
-  const pill=cerr?'<span class="pill off"><i></i>Cerrada por hoy</span>':abierta?'<span class="pill"><i></i>En vivo</span>':'<span class="pill off"><i></i>Programando</span>';
   let cuerpo;
   if(cerr)cuerpo=`<p class="note">🔒 La mesa principal está cerrada por hoy. Vuelve a abrir mañana.</p>`;
-  else if(!abierta)cuerpo=`<p class="note">La próxima partida se programa cuando termine la que está en juego.</p>`;
-  else cuerpo=`<div class="when">⏰ Empieza a las <b class="gold">${esc(horaTxt(ini))}</b> · faltan <b id="cdt">${cuentaProg(mp)}</b></div>
-    <div class="sep">${mp.participantes.includes(U.uid)?`<div class="msg ok">✅ Ya estás inscripto en esta partida.</div><button class="cta o" data-a="ver" data-id="${mp.id}">Ver mi mesa ›</button>`:unirseCtl('principal',mp)}</div>
-    <p class="note">Empieza sola si hay al menos 2 inscriptos; si no, se reprograma ${minEsp()} minutos más tarde y quedás anotado. Podés salir antes y te devolvemos el saldo.</p>`;
-  return `<div class="sala"><div class="row"><span class="badge">PARTIDA REAL</span>${pill}</div>
-    <div class="stitle">Mesa principal</div>
-    <div class="stats"><div><div class="sbig">${np} <small>/ ${P.cupo}</small></div><div class="slab">Jugadores inscriptos</div></div>
-      <div><div class="slab">Cartón</div><div class="sval">${fmt(mp&&mp.precio!=null?mp.precio:P.precio)}</div></div>
-      <div><div class="slab">Pozo</div><div class="sval g">${fmt(mp?pozoNeto(mp):0)}</div></div></div>
-    <div class="bar"><i style="width:${pct}%"></i></div>
+  else if(!mp||!ini)cuerpo=`<p class="note">La próxima partida se programa cuando termine la que está en juego.</p>`;
+  else cuerpo=`<p><b class="gold">Empieza a las ${esc(horaTxt(ini))}</b></p><p class="note">Faltan <b id="cdt">${cuentaProg(mp)}</b>. Empieza sola a esa hora si hay al menos 2 inscriptos; si no, se reprograma ${minEsp()} minutos más tarde y quedás anotado. Podés salir antes y te devolvemos el saldo.</p>${mp.participantes.includes(U.uid)?`<div class="msg ok">✅ Ya estás inscripto en esta partida.</div><button class="b3" data-a="ver" data-id="${mp.id}">Ver mi mesa</button>`:unirseCtl('principal',mp)}`;
+  return `<h2>Mesas</h2>
+  <div class="card"><div class="row"><h2>🎱 Mesa principal</h2><span class="chip">${np}/${P.cupo}</span></div>
+    <p class="note">${P.premios==='ambos'?'Quintina y Bingo':'Solo Bingo'} · Cartón ${fmt(mp&&mp.precio!=null?mp.precio:P.precio)} · Pozo ${fmt(mp?pozoNeto(mp):0)}</p>
     ${cuerpo}</div>
-  ${X.activa?`<div class="sala"><div class="row"><span class="badge free">100% GRATIS</span><span class="pill free">$0</span></div>
-    <div class="stitle">Mesa de práctica</div>
-    <p class="note" style="font-size:16px">Aprendé a jugar sin arriesgar tu saldo. Jugás solo; no reparte premios ni cuenta para el ranking.</p>
-    <div class="sep">${unirseCtl('prueba',null)}</div></div>`:''}`;
+  ${X.activa?`<div class="card"><h2>🎓 Mesa de práctica</h2><p class="note">Jugá gratis, solo y sin esperar rivales. No usa saldo ni reparte premios, ni cuenta para el ranking.</p>${unirseCtl('prueba',null)}</div>`:''}`;
 }
 function esperaView(m){
   const n=m.participantes.length,sala=m.sala||'principal',ini=inicioDe(m);
