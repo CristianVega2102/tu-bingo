@@ -837,7 +837,7 @@ async function mantener(){
     if(cerradaHoy())return;
     const ref=doc(db,'mesas',mp.id);
     if(!inicioDe(mp)){
-      if(mp.previa){
+      if(mp.previa&&!(salaCfg('principal').fijo>Date.now())){
         const loc=mias.find(x=>x.id===mp.previa);let fin=loc?loc.estado==='terminada':false;
         if(!fin&&!loc&&Date.now()-(chkPrev[mp.id]||0)>8000){chkPrev[mp.id]=Date.now();const pd=await getDoc(doc(db,'mesas',mp.previa));fin=!pd.exists()||pd.data().estado==='terminada'}
         if(!fin)return;
