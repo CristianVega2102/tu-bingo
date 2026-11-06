@@ -141,7 +141,7 @@ details.card summary{cursor:pointer;font-family:var(--f);font-weight:600;font-si
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,onAuthStateChanged,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {getFirestore,doc,getDoc,setDoc,addDoc,updateDoc,deleteDoc,onSnapshot,collection,query,where,writeBatch,runTransaction,serverTimestamp,arrayUnion,arrayRemove,increment,orderBy,limit} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getFirestore,Timestamp,doc,getDoc,setDoc,addDoc,updateDoc,deleteDoc,onSnapshot,collection,query,where,writeBatch,runTransaction,serverTimestamp,arrayUnion,arrayRemove,increment,orderBy,limit} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {firebaseConfig} from "./config.js";
 
 const VERSION='2026-11-06 · v14';
@@ -390,18 +390,18 @@ function otrasHTML(){
 }
 const SALAS_NOM={principal:'Mesa principal',prueba:'Práctica'};
 // Datos de cada mesa fija (con los mismos valores por defecto que usan las reglas de Firebase)
-const salaCfg=s=>{const d=salas[s]||{};return{cupo:d.cupo||(s==='principal'?30:50),premios:d.premios||'ambos',precio:cfg.precioCarton,activa:d.activa===true,cerradaHasta:d.cerradaHasta&&d.cerradaHasta.toMillis?d.cerradaHasta.toMillis():0}};
+const salaCfg=s=>{const d=salas[s]||{};return{cupo:d.cupo||(s==='principal'?30:50),premios:d.premios||'ambos',precio:cfg.precioCarton,activa:d.activa===true,cerradaHasta:d.cerradaHasta&&d.cerradaHasta.toMillis?d.cerradaHasta.toMillis():0,fijo:d.programadaPara&&d.programadaPara.toMillis?d.programadaPara.toMillis():0}};
 const minEsp=()=>Math.max(1,+cfg.minEspera||15);
 // Hora de inicio de una mesa principal: se programó (progEn) y empieza minEsp() minutos después
 const inicioDe=m=>m&&m.progEn&&m.progEn.toMillis?m.progEn.toMillis()+minEsp()*60000:0;
 const cerradaHoy=()=>salaCfg('principal').cerradaHasta>Date.now();
 const reabreTxt=()=>{const ms=salaCfg('principal').cerradaHasta;return ms>=4e12?'Se reabrirá cuando el administrador lo indique.':'Se reabre el '+new Date(ms).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})+' hs.'};
-const horaTxt=ms=>new Date(ms).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})+' hs';
+const horaTxt=ms=>{const d=new Date(ms),h=d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})+' hs';return d.toDateString()===new Date().toDateString()?h:d.toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'numeric'})+' '+h};
 const mesaSala=s=>{const a=salas[s]&&salas[s].actual;return a?(abiertas.find(x=>x.id===a&&x.estado==='esperando')||null):null};
 function cuentaProg(m){
   const ms=inicioDe(m)-Date.now();if(!(inicioDe(m)>0))return '—';if(ms<=0)return 'unos segundos';
-  const s_=Math.floor(ms/1000),h=Math.floor(s_/3600),mi=Math.floor(s_%3600/60),se=s_%60;
-  return (h?h+' h ':'')+mi+' min '+se+' s';
+  const s_=Math.floor(ms/1000),dd=Math.floor(s_/86400),h=Math.floor(s_%86400/3600),mi=Math.floor(s_%3600/60),se=s_%60;
+  return (dd?dd+' d ':'')+(h?h+' h ':'')+mi+' min'+(dd?'':' '+se+' s');
 }
 function unirseCtl(s,m,rev,cls){
   const c=salaCfg(s),pr=s==='prueba'?0:(m&&m.precio!=null?m.precio:c.precio),lleno=!!m&&m.participantes.length>=c.cupo,cierra=s==='principal'&&(cerradaHoy()||!m||!(inicioDe(m)>Date.now())),sin=me.saldo<(+pref.n)*pr;
@@ -842,7 +842,8 @@ async function mantener(){
         if(!fin&&!loc&&Date.now()-(chkPrev[mp.id]||0)>8000){chkPrev[mp.id]=Date.now();const pd=await getDoc(doc(db,'mesas',mp.previa));fin=!pd.exists()||pd.data().estado==='terminada'}
         if(!fin)return;
       }
-      await updateDoc(ref,{progEn:serverTimestamp()});
+      const fj=salaCfg('principal').fijo;
+      await updateDoc(ref,{progEn:fj>Date.now()?Timestamp.fromMillis(fj-minEsp()*60000):serverTimestamp()});
     }else if(mp.participantes.length<2&&Date.now()>=inicioDe(mp)+2500+Math.floor(Math.random()*1500)){
       await updateDoc(ref,{progEn:serverTimestamp()});
     }
